@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import logging
 import os
+import queue
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -82,43 +84,141 @@ def is_supported(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
 
 
+def wait_for_complete_copy(path: Path, stable_checks: int = 3, delay: float = 2.0) -> None:
+    previous_size = -1
+    stable_count = 0
+    logging.info("Waiting for file to finish copying: %s", path)
+    while stable_count < stable_checks:
+        if not path.exists():
+            raise FileNotFoundError(f"File disappeared before processing: {path}")
+        current_size = path.stat().st_size
+        if current_size == previous_size and current_size > 0:
+            stable_count += 1
+            logging.info(
+                "File size stable check %s/%s for %s (%s bytes)",
+                stable_count,
+                stable_checks,
+                path,
+                current_size,
+            )
+        else:
+            if previous_size != -1:
+                logging.info("File size changed for %s: %s -> %s bytes", path, previous_size, current_size)
+            previous_size = current_size
+            stable_count = 0
+        time.sleep(delay)
+
+
 class InboxHandler(FileSystemEventHandler):
     def __init__(self, script_dir: Path) -> None:
         self.script_dir = script_dir
-        self.seen: set[Path] = set()
+        self.queue: queue.Queue[Path] = queue.Queue()
+        self.queued: set[Path] = set()
+        self.processing: set[Path] = set()
+        self.completed: set[Path] = set()
+        self.lock = threading.Lock()
 
     def on_created(self, event) -> None:  # type: ignore[no-untyped-def]
         if not event.is_directory:
-            self.handle(Path(event.src_path))
+            self.enqueue(Path(event.src_path), "created")
 
     def on_moved(self, event) -> None:  # type: ignore[no-untyped-def]
         if not event.is_directory:
-            self.handle(Path(event.dest_path))
+            self.enqueue(Path(event.dest_path), "moved")
+
+    def on_modified(self, event) -> None:  # type: ignore[no-untyped-def]
+        if not event.is_directory:
+            self.enqueue(Path(event.src_path), "modified")
+
+    def enqueue(self, path: Path, reason: str) -> None:
+        path = path.expanduser().resolve()
+        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            logging.info("Skipping unsupported file event (%s): %s", reason, path)
+            return
+
+        with self.lock:
+            if path in self.completed:
+                logging.info("Skipping already completed file event (%s): %s", reason, path)
+                return
+            if path in self.queued or path in self.processing:
+                logging.info("Skipping duplicate file event (%s): %s", reason, path)
+                return
+            self.queued.add(path)
+
+        logging.info("Queued media file from %s event: %s", reason, path)
+        print(f"Queued media file: {path}", flush=True)
+        self.queue.put(path)
+
+    def scan_existing(self, inbox_dir: Path) -> None:
+        logging.info("Scanning existing inbox files: %s", inbox_dir)
+        for path in sorted(inbox_dir.iterdir()):
+            if path.is_file():
+                self.enqueue(path, "startup-scan")
+
+    def start_worker(self) -> threading.Thread:
+        worker = threading.Thread(target=self.worker_loop, name="avt-worker", daemon=True)
+        worker.start()
+        return worker
+
+    def worker_loop(self) -> None:
+        while True:
+            path = self.queue.get()
+            try:
+                self.process(path)
+            finally:
+                self.queue.task_done()
+
+    def process(self, path: Path) -> None:
+        with self.lock:
+            self.queued.discard(path)
+            self.processing.add(path)
+
+        try:
+            if not is_supported(path):
+                logging.info("Skipping missing or unsupported file before processing: %s", path)
+                return
+
+            logging.info("Starting transcription job: %s", path)
+            print(f"Starting transcription: {path}", flush=True)
+            wait_for_complete_copy(path)
+
+            command = [
+                python_bin(),
+                str(self.script_dir / "transcribe.py"),
+                str(path),
+                "--move-done",
+                "--no-wait",
+            ]
+            logging.info("Running command: %s", " ".join(command))
+            subprocess.run(command, check=True)
+            logging.info("Completed transcription job: %s", path)
+            print(f"Completed transcription: {path}", flush=True)
+            with self.lock:
+                self.completed.add(path)
+        except subprocess.CalledProcessError as exc:
+            logging.exception("Transcription command failed for %s with exit code %s", path, exc.returncode)
+            print(f"Transcription failed. Check logs for details: {path}", file=sys.stderr, flush=True)
+        except Exception:
+            logging.exception("Transcription failed for: %s", path)
+            print(f"Transcription failed. Check logs for details: {path}", file=sys.stderr, flush=True)
+        finally:
+            with self.lock:
+                self.processing.discard(path)
 
     def handle(self, path: Path) -> None:
-        path = path.expanduser().resolve()
-        if path in self.seen:
-            return
-        if not is_supported(path):
-            logging.info("Ignoring unsupported file: %s", path)
-            return
+        # Backward-compatible helper for tests and older callers.
+        self.enqueue(path, "manual")
 
-        self.seen.add(path)
-        print(f"New media file detected: {path}")
-        logging.info("New media file detected: %s", path)
 
-        command = [
-            python_bin(),
-            str(self.script_dir / "transcribe.py"),
-            str(path),
-            "--move-done",
-        ]
-        try:
-            subprocess.run(command, check=True)
-            logging.info("Finished transcribing: %s", path)
-        except subprocess.CalledProcessError:
-            logging.exception("Transcription failed for: %s", path)
-            print(f"Transcription failed. Check logs for details: {path}", file=sys.stderr)
+def log_environment(dirs: dict[str, Path]) -> None:
+    logging.info("Inbox: %s", dirs["inbox"])
+    logging.info("Output: %s", dirs["output"])
+    logging.info("Done: %s", dirs["done"])
+    logging.info("Logs: %s", dirs["logs"])
+    logging.info("AVT_BASE_DIR=%s", os.environ.get("AVT_BASE_DIR", "not set"))
+    logging.info("AVT_PYTHON_BIN=%s", os.environ.get("AVT_PYTHON_BIN", "not set"))
+    logging.info("AVT_WHISPER_BIN=%s", os.environ.get("AVT_WHISPER_BIN", "not set"))
+    logging.info("Python executable=%s", python_bin())
 
 
 def main() -> int:
@@ -132,11 +232,15 @@ def main() -> int:
     print(f"Output: {dirs['output']}")
     print(f"Done:   {dirs['done']}")
     print(f"Logs:   {dirs['logs']}")
-    logging.info("Watching inbox: %s", dirs["inbox"])
+    log_environment(dirs)
 
     observer = Observer()
-    observer.schedule(InboxHandler(script_dir), str(dirs["inbox"]), recursive=False)
+    handler = InboxHandler(script_dir)
+    handler.start_worker()
+    handler.scan_existing(dirs["inbox"])
+    observer.schedule(handler, str(dirs["inbox"]), recursive=False)
     observer.start()
+    logging.info("Watching inbox for created, moved, and modified events: %s", dirs["inbox"])
 
     try:
         while True:

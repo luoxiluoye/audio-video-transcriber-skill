@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_VENV_DIR="${HOME}/.audio-video-transcriber/venv"
 AVT_VENV_DIR_VALUE="${AVT_VENV_DIR:-$DEFAULT_VENV_DIR}"
+COMMON_WHISPER_ENV_DIR="${HOME}/whisper-env"
 PYTHON_CANDIDATE="${AVT_PYTHON_BIN:-}"
 
 detect_os() {
@@ -28,6 +29,18 @@ find_python() {
     echo "$PYTHON_CANDIDATE"
     return 0
   fi
+  if [ -x "$AVT_VENV_DIR_VALUE/bin/python" ]; then
+    echo "$AVT_VENV_DIR_VALUE/bin/python"
+    return 0
+  fi
+  if [ -x "$DEFAULT_VENV_DIR/bin/python" ]; then
+    echo "$DEFAULT_VENV_DIR/bin/python"
+    return 0
+  fi
+  if [ -x "$COMMON_WHISPER_ENV_DIR/bin/python" ]; then
+    echo "$COMMON_WHISPER_ENV_DIR/bin/python"
+    return 0
+  fi
   if command -v python3 >/dev/null 2>&1; then
     command -v python3
     return 0
@@ -46,6 +59,14 @@ find_whisper() {
   fi
   if [ -x "$AVT_VENV_DIR_VALUE/bin/whisper" ]; then
     echo "$AVT_VENV_DIR_VALUE/bin/whisper"
+    return 0
+  fi
+  if [ -x "$DEFAULT_VENV_DIR/bin/whisper" ]; then
+    echo "$DEFAULT_VENV_DIR/bin/whisper"
+    return 0
+  fi
+  if [ -x "$COMMON_WHISPER_ENV_DIR/bin/whisper" ]; then
+    echo "$COMMON_WHISPER_ENV_DIR/bin/whisper"
     return 0
   fi
   return 1

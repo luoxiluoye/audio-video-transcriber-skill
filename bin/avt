@@ -14,6 +14,7 @@ Usage:
   ./bin/avt bootstrap
   ./bin/avt transcribe "/path/to/file.mp4" [transcribe options]
   ./bin/avt watch
+  ./bin/avt test-watch "/path/to/file.mp4" [timeout_seconds]
   ./bin/avt stop
   ./bin/avt status
   ./bin/avt help
@@ -24,6 +25,7 @@ Examples:
   ./bin/avt transcribe ~/Desktop/test.mp4
   ./bin/avt transcribe ~/Desktop/test.mp4 --model medium --language auto
   ./bin/avt watch
+  ./bin/avt test-watch ~/Desktop/test.mp4
   ./bin/avt stop
   ./bin/avt status
 EOF
@@ -62,6 +64,9 @@ case "$COMMAND" in
     ;;
   watch)
     "$SCRIPT_DIR/start_watcher.sh" "$@"
+    ;;
+  test-watch)
+    "$SCRIPT_DIR/test_watcher.sh" "$@"
     ;;
   stop)
     "$SCRIPT_DIR/stop_watcher.sh" "$@"

@@ -33,6 +33,8 @@ DEFAULT_VENV_WHISPER_CANDIDATES = (
     DEFAULT_VENV_DIR / "bin" / "whisper.exe",
     DEFAULT_VENV_DIR / "Scripts" / "whisper.exe",
     DEFAULT_VENV_DIR / "Scripts" / "whisper",
+    Path("~/whisper-env/bin/whisper").expanduser(),
+    Path("~/whisper-env/bin/whisper.exe").expanduser(),
 )
 
 
@@ -113,6 +115,15 @@ def find_whisper(cli_value: str | None) -> str | None:
                 venv_dir / "bin" / "whisper.exe",
                 venv_dir / "Scripts" / "whisper.exe",
                 venv_dir / "Scripts" / "whisper",
+            ]
+        )
+    python_bin = os.environ.get("AVT_PYTHON_BIN") or sys.executable
+    if python_bin:
+        python_dir = expand_path(python_bin).parent
+        candidates.extend(
+            [
+                python_dir / "whisper",
+                python_dir / "whisper.exe",
             ]
         )
     candidates.extend(DEFAULT_VENV_WHISPER_CANDIDATES)
