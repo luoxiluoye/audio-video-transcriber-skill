@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "audio-video-transcriber": {
+      "command": "python3",
+      "args": [
+        "mcp/server.py"
+      ],
+      "env": {
+        "AVT_BASE_DIR": "~/AudioVideoTranscriber",
+        "AVT_MODEL": "small",
+        "AVT_LANGUAGE": "Chinese",
+        "AVT_WHISPER_BIN": "",
+        "AVT_PYTHON_BIN": "python3",
+        "AVT_VENV_DIR": "~/.audio-video-transcriber/venv"
+      }
+    }
+  }
+}
