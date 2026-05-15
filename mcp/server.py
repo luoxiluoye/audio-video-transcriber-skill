@@ -100,6 +100,28 @@ def transcribe_file(
 
 
 @mcp.tool()
+def postprocess_transcript(
+    transcript_path: str,
+    source_file: str = "",
+    output_dir: str | None = None,
+    overwrite: bool = False,
+) -> dict[str, Any]:
+    """Create agent-ready summary and correction Markdown files for a transcript."""
+    command = [
+        configured_python(),
+        str(script_path("postprocess.py")),
+        str(Path(transcript_path).expanduser()),
+    ]
+    if source_file:
+        command.extend(["--source-file", str(Path(source_file).expanduser())])
+    if output_dir:
+        command.extend(["--output-dir", str(Path(output_dir).expanduser())])
+    if overwrite:
+        command.append("--overwrite")
+    return run_command(command)
+
+
+@mcp.tool()
 def start_watcher(base_dir: str | None = None) -> dict[str, Any]:
     """Start the local inbox watcher."""
     env_overrides = {}

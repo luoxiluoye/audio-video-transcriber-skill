@@ -13,6 +13,7 @@ Usage:
   ./bin/avt install
   ./bin/avt bootstrap
   ./bin/avt transcribe "/path/to/file.mp4" [transcribe options]
+  ./bin/avt review "/path/to/transcript.txt"
   ./bin/avt watch
   ./bin/avt test-watch "/path/to/file.mp4" [timeout_seconds]
   ./bin/avt stop
@@ -24,6 +25,7 @@ Examples:
   ./bin/avt bootstrap
   ./bin/avt transcribe ~/Desktop/test.mp4
   ./bin/avt transcribe ~/Desktop/test.mp4 --model medium --language auto
+  ./bin/avt review ~/AudioVideoTranscriber/output/test.txt
   ./bin/avt watch
   ./bin/avt test-watch ~/Desktop/test.mp4
   ./bin/avt stop
@@ -61,6 +63,16 @@ case "$COMMAND" in
       exit 1
     fi
     python3 "$SCRIPT_DIR/transcribe.py" "$@"
+    ;;
+  review)
+    if [ "$#" -lt 1 ]; then
+      echo "Missing transcript file."
+      echo
+      echo "Example:"
+      echo "  ./bin/avt review \"$HOME/AudioVideoTranscriber/output/test.txt\""
+      exit 1
+    fi
+    python3 "$SCRIPT_DIR/postprocess.py" "$@"
     ;;
   watch)
     "$SCRIPT_DIR/start_watcher.sh" "$@"

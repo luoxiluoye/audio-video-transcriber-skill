@@ -167,6 +167,38 @@ def expected_outputs(input_path: Path, output_dir: Path) -> list[Path]:
     return sorted(output_dir.glob(f"{input_path.stem}.*"))
 
 
+def find_transcript_output(input_path: Path, output_dir: Path) -> Path | None:
+    for suffix in (".txt", ".vtt", ".srt", ".tsv", ".json"):
+        candidate = output_dir / f"{input_path.stem}{suffix}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def create_review_files(input_path: Path, output_dir: Path, overwrite: bool = False) -> None:
+    transcript_path = find_transcript_output(input_path, output_dir)
+    if not transcript_path:
+        logging.info("Skipping review files because no transcript output was found for: %s", input_path)
+        return
+
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve().parent / "postprocess.py"),
+        str(transcript_path),
+        "--source-file",
+        str(input_path),
+        "--output-dir",
+        str(output_dir),
+    ]
+    if overwrite:
+        command.append("--overwrite")
+    logging.info("Creating review files for %s", transcript_path)
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as exc:
+        logging.warning("Could not create review files for %s: %s", transcript_path, exc)
+
+
 def run_whisper(
     whisper_bin: str,
     input_path: Path,
@@ -222,6 +254,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--format", default="all", help="Whisper output format.")
     parser.add_argument("--whisper-bin", default=None, help="Path to the Whisper CLI.")
+    parser.add_argument(
+        "--no-review",
+        action="store_true",
+        help="Do not create summary/correction Markdown workspaces after transcription.",
+    )
+    parser.add_argument(
+        "--overwrite-review",
+        action="store_true",
+        help="Overwrite existing summary/correction Markdown workspaces.",
+    )
     return parser
 
 
@@ -260,6 +302,8 @@ def main(argv: list[str] | None = None) -> int:
         if existing_txt.exists():
             logging.info("Skipping because output already exists: %s", existing_txt)
             print(f"Already transcribed, skipping: {existing_txt}")
+            if not args.no_review:
+                create_review_files(input_path, output_dir, overwrite=args.overwrite_review)
             return 0
 
         if not args.no_wait:
@@ -283,6 +327,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"Transcription finished, but no output files were found in {output_dir}.")
             logging.warning("No output files found for %s in %s", input_path, output_dir)
+
+        if not args.no_review:
+            create_review_files(input_path, output_dir, overwrite=args.overwrite_review)
 
         if args.move_done:
             destination = unique_destination(dirs["done"] / input_path.name)

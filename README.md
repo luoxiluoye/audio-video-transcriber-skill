@@ -18,6 +18,7 @@ This project works even without Codex. Codex Plugin / Skill is one integration l
 - Local processing: audio and video files are not uploaded.
 - Supports audio and video: `mp3`, `wav`, `m4a`, `aac`, `flac`, `mp4`, `mov`, `mkv`, `avi`, `webm`.
 - Outputs Whisper formats such as `txt`, `srt`, `vtt`, `json`, and `tsv`.
+- Creates a post-transcription review pack: `*.summary.md` and `*.corrections.md`.
 - Single-file transcription.
 - Inbox watcher workflow for automatic local transcription.
 - Auto-detects an existing local Whisper CLI.
@@ -53,6 +54,7 @@ Use the universal CLI entrypoint from the repository root:
 ./bin/avt doctor
 ./bin/avt bootstrap
 ./bin/avt transcribe ~/Desktop/test.mp4
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt
 ./bin/avt watch
 ./bin/avt stop
 ./bin/avt status
@@ -66,6 +68,7 @@ On Windows PowerShell, use:
 .\bin\avt.ps1 doctor
 .\bin\avt.ps1 bootstrap
 .\bin\avt.ps1 transcribe "$env:USERPROFILE\Desktop\test.mp4"
+.\bin\avt.ps1 review "$env:USERPROFILE\AudioVideoTranscriber\output\test.txt"
 .\bin\avt.ps1 watch
 .\bin\avt.ps1 stop
 .\bin\avt.ps1 status
@@ -314,6 +317,7 @@ Reference MCP config:
 Available MCP tools:
 
 - `transcribe_file`
+- `postprocess_transcript`
 - `start_watcher`
 - `stop_watcher`
 - `status`
@@ -341,6 +345,40 @@ Use automatic language detection:
 
 ```bash
 ./bin/avt transcribe ~/Desktop/test.mp4 --language auto
+```
+
+## Post-Transcription Review Pack
+
+Every successful transcription creates two extra Markdown files next to the Whisper outputs:
+
+```text
+<name>.summary.md
+<name>.corrections.md
+```
+
+`*.summary.md` is a content-summary workspace with sections for core information, key viewpoints, timeline, action items, and highlight summary.
+
+`*.corrections.md` is a correction workspace with tables for likely wrong words, proper nouns, people, places, organizations, original sentences, suggested fixes, and a polished transcript.
+
+The review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. If no local LLM-capable agent is available, the files remain as clear Markdown handoff templates containing the transcript path and explicit task instructions for a future agent pass.
+
+Create the review pack for an existing transcript:
+
+```bash
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt
+```
+
+Skip review-pack generation for one transcription:
+
+```bash
+./bin/avt transcribe ~/Desktop/test.mp4 --no-review
+```
+
+Overwrite existing review files:
+
+```bash
+./bin/avt transcribe ~/Desktop/test.mp4 --overwrite-review
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --overwrite
 ```
 
 ## Automatic Inbox Watcher
@@ -376,6 +414,8 @@ Default directories:
 ~/AudioVideoTranscriber/done
 ~/AudioVideoTranscriber/logs
 ```
+
+The default output folder contains Whisper outputs such as `json`, `srt`, `tsv`, `txt`, and `vtt`, plus the post-transcription review pack files `*.summary.md` and `*.corrections.md`.
 
 Change them with:
 

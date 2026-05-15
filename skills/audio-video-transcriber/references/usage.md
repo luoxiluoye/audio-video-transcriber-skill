@@ -50,10 +50,35 @@ With a custom output directory:
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --output-dir "$HOME/transcripts"
 ```
 
+Skip the summary/correction review pack:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --no-review
+```
+
 Move the source file to `done` after success:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --move-done
+```
+
+## Post-Transcription Review Pack
+
+By default, each transcription creates:
+
+```text
+<name>.summary.md
+<name>.corrections.md
+```
+
+The summary file asks an agent to fill in core information, key viewpoints, timeline, action items, and highlight summary. The corrections file asks an agent to identify likely wrong words, proper nouns, people, places, organizations, original sentences, suggested fixes, and a polished transcript.
+
+If no local LLM API or capable agent is available, these files are still useful Markdown handoff templates. They contain the transcript path and clear task instructions.
+
+Create or refresh the review pack for an existing transcript:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --overwrite
 ```
 
 ## Automatic Inbox Watcher

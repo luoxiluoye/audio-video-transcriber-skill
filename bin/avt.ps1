@@ -19,6 +19,7 @@ Usage:
   .\bin\avt.ps1 install
   .\bin\avt.ps1 bootstrap
   .\bin\avt.ps1 transcribe "C:\path\to\file.mp4" [transcribe options]
+  .\bin\avt.ps1 review "C:\path\to\transcript.txt"
   .\bin\avt.ps1 watch
   .\bin\avt.ps1 stop
   .\bin\avt.ps1 status
@@ -29,6 +30,7 @@ Examples:
   .\bin\avt.ps1 bootstrap
   .\bin\avt.ps1 transcribe "$env:USERPROFILE\Desktop\test.mp4"
   .\bin\avt.ps1 transcribe "$env:USERPROFILE\Desktop\test.mp4" --model medium --language auto
+  .\bin\avt.ps1 review "$env:USERPROFILE\AudioVideoTranscriber\output\test.txt"
   .\bin\avt.ps1 watch
   .\bin\avt.ps1 stop
   .\bin\avt.ps1 status
@@ -54,6 +56,14 @@ switch ($Command.ToLowerInvariant()) {
         }
         $python = if ($env:AVT_PYTHON_BIN) { $env:AVT_PYTHON_BIN } else { "python" }
         & $python (Join-Path $ScriptDir "transcribe.py") @RemainingArgs
+    }
+    "review" {
+        if ($RemainingArgs.Count -lt 1) {
+            Write-Error "Missing transcript file. Example: .\bin\avt.ps1 review `"$env:USERPROFILE\AudioVideoTranscriber\output\test.txt`""
+            exit 1
+        }
+        $python = if ($env:AVT_PYTHON_BIN) { $env:AVT_PYTHON_BIN } else { "python" }
+        & $python (Join-Path $ScriptDir "postprocess.py") @RemainingArgs
     }
     "watch" { & (Join-Path $ScriptDir "start_watcher.ps1") @RemainingArgs }
     "stop" { & (Join-Path $ScriptDir "stop_watcher.ps1") @RemainingArgs }

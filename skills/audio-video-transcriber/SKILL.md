@@ -46,6 +46,7 @@ Defaults:
 - Model: `small`
 - Language: `Chinese`
 - Output format: `all`
+- Review pack: enabled by default, creates `*.summary.md` and `*.corrections.md`
 
 Supported extensions: `mp3`, `wav`, `m4a`, `aac`, `flac`, `mp4`, `mov`, `mkv`, `avi`, `webm`.
 
@@ -57,6 +58,19 @@ When the user asks to transcribe a specific file, call:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
+```
+
+After transcription, the script creates a local post-transcription review pack beside the Whisper outputs:
+
+- `*.summary.md`: content summary workspace with core information, key viewpoints, timeline, action items, and highlight summary.
+- `*.corrections.md`: correction workspace with likely wrong words, proper nouns, names/places/organizations, original sentences, suggested fixes, and polished text.
+
+These Markdown files are deterministic agent handoff templates. They include the transcript path and explicit task instructions. If no local LLM API or capable agent is available, do not fail; leave the templates for a later agent pass. Do not upload transcripts or media files.
+
+When the user asks to create or refresh the review pack for an existing transcript, call:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt"
 ```
 
 When the user asks to start automatic transcription or watch an inbox folder, call:
@@ -119,6 +133,18 @@ Single-file transcription:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
+```
+
+Create summary/correction Markdown for an existing transcript:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt"
+```
+
+Skip review-pack generation for one transcription:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --no-review
 ```
 
 Start inbox watcher:

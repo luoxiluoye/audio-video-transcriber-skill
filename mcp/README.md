@@ -26,6 +26,7 @@ Most MCP clients start the server for you using `.mcp.json`.
 ## Tools
 
 - `transcribe_file`: transcribe a local audio/video file.
+- `postprocess_transcript`: create `*.summary.md` and `*.corrections.md` for an existing transcript.
 - `start_watcher`: start the local inbox watcher.
 - `stop_watcher`: stop the watcher.
 - `status`: show watcher status, paths, and recent logs.

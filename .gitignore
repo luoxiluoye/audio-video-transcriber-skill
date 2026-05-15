@@ -24,6 +24,8 @@ AudioVideoTranscriber/
 *.json
 *.tsv
 *.txt
+*.summary.md
+*.corrections.md
 *.pt
 *.pth
 *.bin
