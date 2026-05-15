@@ -46,7 +46,8 @@ Defaults:
 - Model: `small`
 - Language: `Chinese`
 - Output format: `all`
-- Review pack: enabled by default, creates `*.summary.md` and `*.corrections.md`
+- Review pack: enabled by default, creates `*.transcript.docx`, `*.summary.md`, `*.summary.docx`, `*.corrections.md`, and `*.corrections.docx`
+- Optional review HTML: use `--html` or `--all` to create `*.summary.html` and `*.corrections.html`
 
 Supported extensions: `mp3`, `wav`, `m4a`, `aac`, `flac`, `mp4`, `mov`, `mkv`, `avi`, `webm`.
 
@@ -62,15 +63,39 @@ python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
 
 After transcription, the script creates a local post-transcription review pack beside the Whisper outputs:
 
-- `*.summary.md`: content summary workspace with core information, key viewpoints, timeline, action items, and highlight summary.
-- `*.corrections.md`: correction workspace with likely wrong words, proper nouns, names/places/organizations, original sentences, suggested fixes, and polished text.
+- `*.transcript.docx`: complete transcript deliverable with title, source file name, generation time, transcript path, output format list, paragraphs, and timestamps when available.
+- `*.summary.md` and `*.summary.docx`: content-summary deliverables with core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary.
+- `*.corrections.md` and `*.corrections.docx`: correction deliverables with likely recognition errors, proper noun normalization, sentence polishing notes, and corrected text.
+- `*.summary.html` and `*.corrections.html`: optional standalone HTML deliverables when the user asks for HTML or all formats.
 
-These Markdown files are deterministic agent handoff templates. They include the transcript path and explicit task instructions. If no local LLM API or capable agent is available, do not fail; leave the templates for a later agent pass. Do not upload transcripts or media files.
+The local scripts generate structured templates and Word/HTML shells. They do not call an LLM and do not pretend the summary/corrections are finished. If the user asks to "transcribe and summarize", "整理", "精修", or "生成纪要", the agent must continue after transcription:
+
+1. Read the transcript output.
+2. Fill `*.summary.md` with a real summary, including data and information analysis when numbers, dates, money, percentages, rankings, comparison, growth/decline, business metrics, or task milestones appear.
+3. Fill `*.corrections.md` with likely ASR mistakes, proper nouns, sentence polish notes, and corrected text.
+4. Regenerate or update `*.summary.docx` and `*.corrections.docx`; generate/update HTML too when useful or requested.
+5. Tell the user where every output file is and which file is best for direct delivery.
+
+Do not rerun `postprocess.py --overwrite` after manually filling the summary/corrections unless you intend to reset the deliverables back to templates. When converting filled Markdown into Word/HTML, preserve the completed content.
+
+If no local LLM API or capable agent is available, do not fail; leave the templates for a later agent pass. Do not upload transcripts or media files.
 
 When the user asks to create or refresh the review pack for an existing transcript, call:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt"
+```
+
+For HTML deliverables, call:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
+```
+
+For all review formats, call:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --all
 ```
 
 When the user asks to start automatic transcription or watch an inbox folder, call:
@@ -135,10 +160,16 @@ Single-file transcription:
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
 ```
 
-Create summary/correction Markdown for an existing transcript:
+Create review deliverables for an existing transcript:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt"
+```
+
+Create review deliverables with HTML:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
 ```
 
 Skip review-pack generation for one transcription:

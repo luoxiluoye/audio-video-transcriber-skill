@@ -64,11 +64,11 @@ else
 fi
 
 echo
-echo "Installing watchdog for the inbox watcher."
+echo "Installing watchdog for the inbox watcher and python-docx for Word review files."
 if [ -n "${AVT_PYTHON_BIN:-}" ]; then
-  "$PYTHON_BIN" -m pip install -U watchdog
+  "$PYTHON_BIN" -m pip install -U watchdog python-docx
 else
-  "$PYTHON_BIN" -m pip install --user -U watchdog
+  "$PYTHON_BIN" -m pip install --user -U watchdog python-docx
 fi
 
 echo

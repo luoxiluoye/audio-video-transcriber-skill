@@ -50,7 +50,7 @@ With a custom output directory:
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --output-dir "$HOME/transcripts"
 ```
 
-Skip the summary/correction review pack:
+Skip the review pack:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --no-review
@@ -67,18 +67,39 @@ python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
 By default, each transcription creates:
 
 ```text
+<name>.transcript.docx
 <name>.summary.md
+<name>.summary.docx
 <name>.corrections.md
+<name>.corrections.docx
 ```
 
-The summary file asks an agent to fill in core information, key viewpoints, timeline, action items, and highlight summary. The corrections file asks an agent to identify likely wrong words, proper nouns, people, places, organizations, original sentences, suggested fixes, and a polished transcript.
+The transcript Word file is a complete transcript deliverable. The summary files ask an agent to fill in core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary. The corrections files ask an agent to identify likely recognition errors, normalize proper nouns, explain sentence polishing, and produce corrected text.
 
-If no local LLM API or capable agent is available, these files are still useful Markdown handoff templates. They contain the transcript path and clear task instructions.
+If no local LLM API or capable agent is available, these files are still useful structured templates. They contain the transcript path and clear task instructions.
 
 Create or refresh the review pack for an existing transcript:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --overwrite
+```
+
+Generate standalone HTML too:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
+```
+
+Generate every supported review format:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --all
+```
+
+Keep Markdown only:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --markdown-only
 ```
 
 ## Automatic Inbox Watcher

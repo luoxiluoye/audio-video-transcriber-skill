@@ -20,9 +20,9 @@ python3 -m venv "$AVT_VENV_DIR"
 # shellcheck disable=SC1091
 source "$AVT_VENV_DIR/bin/activate"
 
-echo "Installing Python packages: openai-whisper and watchdog"
+echo "Installing Python packages: openai-whisper, watchdog, and python-docx"
 python -m pip install -U pip setuptools wheel
-python -m pip install -U openai-whisper watchdog
+python -m pip install -U openai-whisper watchdog python-docx
 
 mkdir -p "$AVT_BASE_DIR/inbox" "$AVT_BASE_DIR/output" "$AVT_BASE_DIR/done" "$AVT_BASE_DIR/logs"
 

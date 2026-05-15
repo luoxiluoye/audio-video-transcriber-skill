@@ -41,10 +41,12 @@ $WhisperPath = Get-WhisperPath
 $FfmpegPath = Get-CommandPath "ffmpeg"
 $PipStatus = ""
 $WatchdogStatus = ""
+$PythonDocxStatus = ""
 
 if ($PythonPath) {
     try { $PipStatus = (& $PythonPath -m pip --version 2>$null) -join "`n" } catch { $PipStatus = "" }
     try { $WatchdogStatus = (& $PythonPath -c "import watchdog; print('installed')" 2>$null) -join "`n" } catch { $WatchdogStatus = "" }
+    try { $PythonDocxStatus = (& $PythonPath -c "import docx; print('installed')" 2>$null) -join "`n" } catch { $PythonDocxStatus = "" }
 }
 
 Write-Host "Audio Video Transcriber doctor"
@@ -55,6 +57,7 @@ Write-Check "pip" $PipStatus
 Write-Check "whisper CLI" $WhisperPath
 Write-Check "ffmpeg" $FfmpegPath
 Write-Check "watchdog" $WatchdogStatus
+Write-Check "python-docx" $PythonDocxStatus
 Write-Host ""
 Write-Host "Environment:"
 "{0,-18} {1}" -f "AVT_WHISPER_BIN:", $(if ($env:AVT_WHISPER_BIN) { $env:AVT_WHISPER_BIN } else { "not set" })
@@ -81,7 +84,7 @@ if (-not $PythonPath) {
     Write-Host "  Install Python 3, then run this doctor again."
 } elseif (-not $WhisperPath) {
     Write-Host "  .\skills\audio-video-transcriber\scripts\install_whisper.ps1"
-} elseif (-not $WatchdogStatus) {
+} elseif ((-not $WatchdogStatus) -or (-not $PythonDocxStatus)) {
     Write-Host "  .\skills\audio-video-transcriber\scripts\install_whisper.ps1"
 } else {
     Write-Host "  .\skills\audio-video-transcriber\scripts\status.ps1"

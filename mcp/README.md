@@ -26,11 +26,11 @@ Most MCP clients start the server for you using `.mcp.json`.
 ## Tools
 
 - `transcribe_file`: transcribe a local audio/video file.
-- `postprocess_transcript`: create `*.summary.md` and `*.corrections.md` for an existing transcript.
+- `postprocess_transcript`: create review deliverables for an existing transcript. By default it creates Markdown plus Word files; set `html=true` or `all_formats=true` for standalone HTML too.
 - `start_watcher`: start the local inbox watcher.
 - `stop_watcher`: stop the watcher.
 - `status`: show watcher status, paths, and recent logs.
-- `doctor`: check Python, Whisper, ffmpeg, watchdog, and environment variables.
+- `doctor`: check Python, Whisper, ffmpeg, watchdog, python-docx, and environment variables.
 - `bootstrap`: initialize local folders and optionally install the Python Whisper environment.
 
 ## Configuration

@@ -89,9 +89,11 @@ WHISPER_PATH="$(find_whisper || true)"
 if [ -n "$PYTHON_PATH" ]; then
   PIP_PATH="$("$PYTHON_PATH" -m pip --version 2>/dev/null || true)"
   WATCHDOG_STATUS="$("$PYTHON_PATH" -c 'import watchdog; print("installed")' 2>/dev/null || true)"
+  PYTHON_DOCX_STATUS="$("$PYTHON_PATH" -c 'import docx; print("installed")' 2>/dev/null || true)"
 else
   PIP_PATH=""
   WATCHDOG_STATUS=""
+  PYTHON_DOCX_STATUS=""
 fi
 
 FFMPEG_PATH="$(command -v ffmpeg 2>/dev/null || true)"
@@ -104,6 +106,7 @@ print_check "pip" "$PIP_PATH"
 print_check "whisper CLI" "$WHISPER_PATH"
 print_check "ffmpeg" "$FFMPEG_PATH"
 print_check "watchdog" "$WATCHDOG_STATUS"
+print_check "python-docx" "$PYTHON_DOCX_STATUS"
 echo
 echo "Environment:"
 printf "  %-18s %s\n" "AVT_WHISPER_BIN:" "${AVT_WHISPER_BIN:-not set}"
@@ -145,7 +148,7 @@ if [ -z "$PYTHON_PATH" ]; then
   echo "  Install Python 3, then run this doctor again."
 elif [ -z "$WHISPER_PATH" ]; then
   echo "  $SCRIPT_DIR/install_whisper.sh"
-elif [ -z "$WATCHDOG_STATUS" ]; then
+elif [ -z "$WATCHDOG_STATUS" ] || [ -z "$PYTHON_DOCX_STATUS" ]; then
   echo "  $SCRIPT_DIR/install.sh"
 else
   echo "  $SCRIPT_DIR/status.sh"

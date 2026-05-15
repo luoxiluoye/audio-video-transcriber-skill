@@ -257,12 +257,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-review",
         action="store_true",
-        help="Do not create summary/correction Markdown workspaces after transcription.",
+        help="Do not create transcript Word, summary, or correction review deliverables after transcription.",
     )
     parser.add_argument(
         "--overwrite-review",
         action="store_true",
-        help="Overwrite existing summary/correction Markdown workspaces.",
+        help="Overwrite existing review deliverables.",
     )
     return parser
 

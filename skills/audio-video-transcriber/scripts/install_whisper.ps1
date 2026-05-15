@@ -31,9 +31,9 @@ if (-not (Test-Path $VenvPython)) {
     exit 1
 }
 
-Write-Host "Installing Python packages: openai-whisper and watchdog"
+Write-Host "Installing Python packages: openai-whisper, watchdog, and python-docx"
 & $VenvPython -m pip install -U pip setuptools wheel
-& $VenvPython -m pip install -U openai-whisper watchdog
+& $VenvPython -m pip install -U openai-whisper watchdog python-docx
 
 New-Item -ItemType Directory -Force -Path `
     (Join-Path $BaseDir "inbox"), `

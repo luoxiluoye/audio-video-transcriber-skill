@@ -105,8 +105,12 @@ def postprocess_transcript(
     source_file: str = "",
     output_dir: str | None = None,
     overwrite: bool = False,
+    html: bool = False,
+    all_formats: bool = False,
+    markdown_only: bool = False,
+    no_docx: bool = False,
 ) -> dict[str, Any]:
-    """Create agent-ready summary and correction Markdown files for a transcript."""
+    """Create Markdown, Word, and optional HTML review deliverables for a transcript."""
     command = [
         configured_python(),
         str(script_path("postprocess.py")),
@@ -118,6 +122,14 @@ def postprocess_transcript(
         command.extend(["--output-dir", str(Path(output_dir).expanduser())])
     if overwrite:
         command.append("--overwrite")
+    if html:
+        command.append("--html")
+    if all_formats:
+        command.append("--all")
+    if markdown_only:
+        command.append("--markdown-only")
+    if no_docx:
+        command.append("--no-docx")
     return run_command(command)
 
 

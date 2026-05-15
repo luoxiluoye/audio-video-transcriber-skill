@@ -26,6 +26,11 @@ AudioVideoTranscriber/
 *.txt
 *.summary.md
 *.corrections.md
+*.transcript.docx
+*.summary.docx
+*.corrections.docx
+*.summary.html
+*.corrections.html
 *.pt
 *.pth
 *.bin

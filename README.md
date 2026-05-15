@@ -18,7 +18,8 @@ This project works even without Codex. Codex Plugin / Skill is one integration l
 - Local processing: audio and video files are not uploaded.
 - Supports audio and video: `mp3`, `wav`, `m4a`, `aac`, `flac`, `mp4`, `mov`, `mkv`, `avi`, `webm`.
 - Outputs Whisper formats such as `txt`, `srt`, `vtt`, `json`, and `tsv`.
-- Creates a post-transcription review pack: `*.summary.md` and `*.corrections.md`.
+- Creates a post-transcription review pack: `*.transcript.docx`, `*.summary.md`, `*.summary.docx`, `*.corrections.md`, and `*.corrections.docx`.
+- Optionally creates handoff-friendly HTML: `*.summary.html` and `*.corrections.html`.
 - Single-file transcription.
 - Inbox watcher workflow for automatic local transcription.
 - Auto-detects an existing local Whisper CLI.
@@ -139,7 +140,7 @@ If that works, run:
 
 ## If You Do Not Have Whisper
 
-Create a local virtual environment and install `openai-whisper` plus `watchdog`:
+Create a local virtual environment and install `openai-whisper`, `watchdog`, and `python-docx`:
 
 ```bash
 ./skills/audio-video-transcriber/scripts/bootstrap.sh --yes
@@ -234,7 +235,7 @@ and installs:
 
 ```powershell
 python -m pip install -U pip setuptools wheel
-python -m pip install -U openai-whisper watchdog
+python -m pip install -U openai-whisper watchdog python-docx
 ```
 
 The scripts do not modify system environment variables automatically. To configure a PowerShell session manually:
@@ -349,23 +350,46 @@ Use automatic language detection:
 
 ## Post-Transcription Review Pack
 
-Every successful transcription creates two extra Markdown files next to the Whisper outputs:
+Every successful transcription creates a review pack next to the Whisper outputs:
 
 ```text
+<name>.transcript.docx
 <name>.summary.md
+<name>.summary.docx
 <name>.corrections.md
+<name>.corrections.docx
 ```
 
-`*.summary.md` is a content-summary workspace with sections for core information, key viewpoints, timeline, action items, and highlight summary.
+`*.transcript.docx` is the complete transcript in a Word-friendly layout. It includes the source file name, generation time, transcript path, output formats, and paragraphs. When the input transcript has SRT/VTT/Whisper timestamps, the Word transcript preserves those time ranges.
 
-`*.corrections.md` is a correction workspace with tables for likely wrong words, proper nouns, people, places, organizations, original sentences, suggested fixes, and a polished transcript.
+`*.summary.md` and `*.summary.docx` are content-summary workspaces with sections for core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary.
 
-The review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. If no local LLM-capable agent is available, the files remain as clear Markdown handoff templates containing the transcript path and explicit task instructions for a future agent pass.
+`*.corrections.md` and `*.corrections.docx` are correction workspaces with tables for likely recognition errors, proper noun normalization, sentence polishing notes, and a corrected-text section.
+
+The review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. Without Codex or another capable agent, the summary and corrections files are structured templates, not finished editorial analysis. In an agent workflow, ask the agent to read the transcript and complete the Markdown, Word, and optional HTML deliverables.
 
 Create the review pack for an existing transcript:
 
 ```bash
 ./bin/avt review ~/AudioVideoTranscriber/output/test.txt
+```
+
+Generate HTML versions too:
+
+```bash
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --html
+```
+
+Generate every supported review format:
+
+```bash
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --all
+```
+
+Keep the old Markdown-only behavior:
+
+```bash
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --markdown-only
 ```
 
 Skip review-pack generation for one transcription:
@@ -380,6 +404,14 @@ Overwrite existing review files:
 ./bin/avt transcribe ~/Desktop/test.mp4 --overwrite-review
 ./bin/avt review ~/AudioVideoTranscriber/output/test.txt --overwrite
 ```
+
+Word output uses the Python package `python-docx`. If it is missing, transcription still succeeds and the review step prints a warning. Install it with:
+
+```bash
+python -m pip install -U python-docx
+```
+
+HTML output is standalone: CSS is embedded in each file, so it can be opened directly or copied into web pages, Feishu Docs, Notion, or public-account drafts.
 
 ## Automatic Inbox Watcher
 
@@ -415,7 +447,7 @@ Default directories:
 ~/AudioVideoTranscriber/logs
 ```
 
-The default output folder contains Whisper outputs such as `json`, `srt`, `tsv`, `txt`, and `vtt`, plus the post-transcription review pack files `*.summary.md` and `*.corrections.md`.
+The default output folder contains Whisper outputs such as `json`, `srt`, `tsv`, `txt`, and `vtt`, plus review-pack files such as `*.transcript.docx`, `*.summary.md`, `*.summary.docx`, `*.corrections.md`, and `*.corrections.docx`.
 
 Change them with:
 
