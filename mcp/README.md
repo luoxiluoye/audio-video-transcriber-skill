@@ -26,7 +26,7 @@ Most MCP clients start the server for you using `.mcp.json`.
 ## Tools
 
 - `transcribe_file`: transcribe a local audio/video file.
-- `postprocess_transcript`: create review deliverables for an existing transcript. By default it creates Markdown plus Word files; set `html=true` or `all_formats=true` for standalone HTML too.
+- `postprocess_transcript`: create review deliverables for an existing transcript. By default it creates Markdown plus Word files; set `html=true` or `all_formats=true` for standalone HTML too. Set `sync=true` after an agent has edited `*.summary.md` or `*.corrections.md` to regenerate DOCX/HTML from the completed Markdown.
 - `start_watcher`: start the local inbox watcher.
 - `stop_watcher`: stop the watcher.
 - `status`: show watcher status, paths, and recent logs.

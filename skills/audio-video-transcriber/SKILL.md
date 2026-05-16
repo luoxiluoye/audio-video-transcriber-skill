@@ -73,10 +73,10 @@ The local scripts generate structured templates and Word/HTML shells. They do no
 1. Read the transcript output.
 2. Fill `*.summary.md` with a real summary, including data and information analysis when numbers, dates, money, percentages, rankings, comparison, growth/decline, business metrics, or task milestones appear.
 3. Fill `*.corrections.md` with likely ASR mistakes, proper nouns, sentence polish notes, and corrected text.
-4. Regenerate or update `*.summary.docx` and `*.corrections.docx`; generate/update HTML too when useful or requested.
+4. Run `./bin/avt review-sync "/path/to/transcript.txt" --all` or `python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all` so the completed Markdown is converted into final DOCX/HTML.
 5. Tell the user where every output file is and which file is best for direct delivery.
 
-Do not rerun `postprocess.py --overwrite` after manually filling the summary/corrections unless you intend to reset the deliverables back to templates. When converting filled Markdown into Word/HTML, preserve the completed content.
+Do not rerun `postprocess.py --overwrite` after manually filling the summary/corrections unless you intend to reset the deliverables back to templates. Use `--sync` or `./bin/avt review-sync` to preserve the completed Markdown content while regenerating Word/HTML.
 
 If no local LLM API or capable agent is available, do not fail; leave the templates for a later agent pass. Do not upload transcripts or media files.
 
@@ -96,6 +96,18 @@ For all review formats, call:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --all
+```
+
+When the user or agent has already completed `*.summary.md` or `*.corrections.md`, sync the finished Markdown to DOCX/HTML instead of rebuilding templates:
+
+```bash
+./bin/avt review-sync "/path/to/transcript.txt" --all
+```
+
+or:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all
 ```
 
 When the user asks to start automatic transcription or watch an inbox folder, call:
@@ -170,6 +182,12 @@ Create review deliverables with HTML:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
+```
+
+Sync completed Markdown to final Word/HTML:
+
+```bash
+./bin/avt review-sync "/path/to/transcript.txt" --all
 ```
 
 Skip review-pack generation for one transcription:

@@ -109,6 +109,7 @@ def postprocess_transcript(
     all_formats: bool = False,
     markdown_only: bool = False,
     no_docx: bool = False,
+    sync: bool = False,
 ) -> dict[str, Any]:
     """Create Markdown, Word, and optional HTML review deliverables for a transcript."""
     command = [
@@ -130,6 +131,8 @@ def postprocess_transcript(
         command.append("--markdown-only")
     if no_docx:
         command.append("--no-docx")
+    if sync:
+        command.append("--sync")
     return run_command(command)
 
 

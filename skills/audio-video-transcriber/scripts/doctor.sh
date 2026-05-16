@@ -143,6 +143,14 @@ if [ -z "$FFMPEG_PATH" ]; then
   echo
 fi
 
+if [ -n "$PYTHON_PATH" ] && [ -z "$PYTHON_DOCX_STATUS" ]; then
+  echo "python-docx not found for the current Python:"
+  echo "  $PYTHON_PATH"
+  echo "Install it with:"
+  echo "  \"$PYTHON_PATH\" -m pip install -U python-docx"
+  echo
+fi
+
 echo "Recommended next step:"
 if [ -z "$PYTHON_PATH" ]; then
   echo "  Install Python 3, then run this doctor again."

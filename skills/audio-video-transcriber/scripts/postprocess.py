@@ -28,6 +28,15 @@ class TranscriptSegment:
     end: str = ""
 
 
+@dataclass(frozen=True)
+class MarkdownBlock:
+    kind: str
+    text: str = ""
+    level: int = 0
+    rows: tuple[tuple[str, ...], ...] = ()
+    items: tuple[str, ...] = ()
+
+
 def expand_path(value: str | Path) -> Path:
     return Path(value).expanduser()
 
@@ -220,7 +229,7 @@ def write_if_needed(path: Path, content: str | bytes, overwrite: bool) -> bool:
 
 
 def output_status(path: Path, written: bool) -> str:
-    return "created" if written else "exists"
+    return "written" if written else "exists"
 
 
 def build_info_lines(transcript_path: Path, source_file: str, generated_at: str, output_formats: list[str]) -> list[str]:
@@ -438,6 +447,146 @@ def table_html(headers: list[str], rows: list[list[str]]) -> str:
     return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
+def split_markdown_row(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def is_markdown_table_separator(line: str) -> bool:
+    cells = split_markdown_row(line)
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells)
+
+
+def parse_markdown_blocks(markdown_text: str) -> list[MarkdownBlock]:
+    blocks: list[MarkdownBlock] = []
+    lines = markdown_text.splitlines()
+    index = 0
+    paragraph: list[str] = []
+
+    def flush_paragraph() -> None:
+        nonlocal paragraph
+        text = "\n".join(line.strip() for line in paragraph if line.strip()).strip()
+        if text:
+            blocks.append(MarkdownBlock(kind="paragraph", text=text))
+        paragraph = []
+
+    while index < len(lines):
+        raw_line = lines[index]
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if not stripped:
+            flush_paragraph()
+            index += 1
+            continue
+
+        if stripped.startswith("```"):
+            flush_paragraph()
+            index += 1
+            code_lines = []
+            while index < len(lines) and not lines[index].strip().startswith("```"):
+                code_lines.append(lines[index].rstrip())
+                index += 1
+            if index < len(lines):
+                index += 1
+            blocks.append(MarkdownBlock(kind="code", text="\n".join(code_lines).strip()))
+            continue
+
+        heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading_match:
+            flush_paragraph()
+            blocks.append(
+                MarkdownBlock(
+                    kind="heading",
+                    level=len(heading_match.group(1)),
+                    text=heading_match.group(2).strip(),
+                )
+            )
+            index += 1
+            continue
+
+        if stripped.startswith("|") and index + 1 < len(lines) and is_markdown_table_separator(lines[index + 1]):
+            flush_paragraph()
+            rows = [tuple(split_markdown_row(stripped))]
+            index += 2
+            while index < len(lines) and lines[index].strip().startswith("|"):
+                rows.append(tuple(split_markdown_row(lines[index])))
+                index += 1
+            blocks.append(MarkdownBlock(kind="table", rows=tuple(rows)))
+            continue
+
+        bullet_match = re.match(r"^[-*]\s+(.+)$", stripped)
+        if bullet_match:
+            flush_paragraph()
+            items = []
+            while index < len(lines):
+                item_match = re.match(r"^[-*]\s+(.+)$", lines[index].strip())
+                if not item_match:
+                    break
+                items.append(item_match.group(1).strip())
+                index += 1
+            blocks.append(MarkdownBlock(kind="list", items=tuple(items)))
+            continue
+
+        paragraph.append(stripped.lstrip("> ").strip())
+        index += 1
+
+    flush_paragraph()
+    return blocks
+
+
+def markdown_title(markdown_text: str, fallback: str) -> str:
+    for block in parse_markdown_blocks(markdown_text):
+        if block.kind == "heading" and block.level == 1 and block.text:
+            return block.text
+    return fallback
+
+
+def extract_backtick_value(markdown_text: str, label: str) -> str:
+    pattern = rf"^{re.escape(label)}:\s*`([^`]+)`\s*$"
+    for line in markdown_text.splitlines():
+        match = re.match(pattern, line.strip())
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def build_sync_info_lines(markdown_path: Path, markdown_text: str, generated_at: str, output_formats: list[str]) -> list[str]:
+    transcript_path = extract_backtick_value(markdown_text, "Transcript") or "unknown"
+    source_media = extract_backtick_value(markdown_text, "Source media") or "unknown"
+    return [
+        f"来源 Markdown：{markdown_path}",
+        f"原始文件名：{Path(source_media).name if source_media != 'unknown' else 'unknown'}",
+        f"同步时间：{generated_at}",
+        f"Transcript 路径：{transcript_path}",
+        f"输出格式列表：{', '.join(output_formats)}",
+    ]
+
+
+def markdown_blocks_to_html(markdown_text: str) -> str:
+    rendered = []
+    for block in parse_markdown_blocks(markdown_text):
+        if block.kind == "heading":
+            level = min(max(block.level + 1, 2), 6)
+            rendered.append(f"<h{level}>{html.escape(block.text)}</h{level}>")
+        elif block.kind == "paragraph":
+            paragraphs = [part.strip() for part in block.text.splitlines() if part.strip()]
+            rendered.extend(f"<p>{html.escape(part)}</p>" for part in paragraphs)
+        elif block.kind == "list":
+            items = "".join(f"<li>{html.escape(item)}</li>" for item in block.items)
+            rendered.append(f"<ul>{items}</ul>")
+        elif block.kind == "table" and block.rows:
+            headers = list(block.rows[0])
+            rows = [list(row) for row in block.rows[1:]]
+            rendered.append(table_html(headers, rows))
+        elif block.kind == "code":
+            rendered.append(f"<pre><code>{html.escape(block.text)}</code></pre>")
+    return "\n".join(rendered)
+
+
+def build_markdown_sync_html(title: str, info_lines: list[str], markdown_text: str) -> str:
+    return build_html_document(title, info_lines, [("正文", markdown_blocks_to_html(markdown_text))])
+
+
 def build_summary_html(info_lines: list[str], transcript: str) -> str:
     data_rows = [["待 agent 核对", signal, "待 agent 填写", "待 agent 填写"] for signal in detect_data_signals(transcript)]
     if not data_rows:
@@ -596,11 +745,135 @@ def create_corrections_docx(
     return save_document(document, path, overwrite)
 
 
+def create_markdown_docx(path: Path, title: str, info_lines: list[str], markdown_text: str, overwrite: bool) -> bool:
+    Document, Pt, qn = import_docx()
+    document = Document()
+    set_doc_style(document, Pt, qn)
+    document.add_heading(title, level=0)
+    add_info_table(document, info_lines)
+    for block in parse_markdown_blocks(markdown_text):
+        if block.kind == "heading":
+            if block.level == 1 and block.text == title:
+                continue
+            document.add_heading(block.text, level=min(max(block.level, 1), 4))
+        elif block.kind == "paragraph":
+            for paragraph in [part.strip() for part in block.text.splitlines() if part.strip()]:
+                document.add_paragraph(paragraph)
+        elif block.kind == "list":
+            for item in block.items:
+                document.add_paragraph(item, style="List Bullet")
+        elif block.kind == "table" and block.rows:
+            add_simple_table(document, list(block.rows[0]), [list(row) for row in block.rows[1:]])
+        elif block.kind == "code":
+            document.add_paragraph(block.text)
+    return save_document(document, path, overwrite)
+
+
+def review_kind_from_markdown(path: Path) -> str | None:
+    name = path.name
+    if name.endswith(".summary.md"):
+        return "summary"
+    if name.endswith(".corrections.md"):
+        return "corrections"
+    return None
+
+
+def base_stem_from_review_markdown(path: Path) -> str:
+    name = path.name
+    if name.endswith(".summary.md"):
+        return name[: -len(".summary.md")]
+    if name.endswith(".corrections.md"):
+        return name[: -len(".corrections.md")]
+    return path.stem
+
+
+def sync_markdown_file(
+    markdown_path: Path,
+    output_dir: Path,
+    include_docx: bool,
+    include_html: bool,
+    overwrite: bool,
+) -> tuple[list[tuple[Path, bool]], list[str]]:
+    if not markdown_path.exists():
+        return [], [f"Markdown file not found: {markdown_path}"]
+    kind = review_kind_from_markdown(markdown_path)
+    if not kind:
+        return [], [f"Expected a *.summary.md or *.corrections.md file: {markdown_path}"]
+
+    markdown_text = read_text(markdown_path)
+    base_stem = base_stem_from_review_markdown(markdown_path)
+    title = markdown_title(markdown_text, "内容总结" if kind == "summary" else "勘误与精修版")
+    generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    output_formats = []
+    if include_docx:
+        output_formats.append(f"{kind}.docx")
+    if include_html:
+        output_formats.append(f"{kind}.html")
+    info_lines = build_sync_info_lines(markdown_path, markdown_text, generated_at, output_formats)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results: list[tuple[Path, bool]] = []
+    warnings: list[str] = []
+
+    if include_docx:
+        docx_path = output_dir / f"{base_stem}.{kind}.docx"
+        try:
+            results.append((docx_path, create_markdown_docx(docx_path, title, info_lines, markdown_text, overwrite)))
+        except RuntimeError as exc:
+            warnings.append(str(exc))
+        except Exception as exc:  # noqa: BLE001 - syncing HTML should still succeed if DOCX fails.
+            warnings.append(f"Could not sync Word output for {markdown_path}: {exc}")
+
+    if include_html:
+        html_path = output_dir / f"{base_stem}.{kind}.html"
+        results.append(
+            (
+                html_path,
+                write_if_needed(html_path, build_markdown_sync_html(title, info_lines, markdown_text), overwrite),
+            )
+        )
+
+    return results, warnings
+
+
+def sibling_review_markdown_paths(transcript_path: Path, output_dir: Path) -> list[Path]:
+    stem = transcript_path.stem
+    return [output_dir / f"{stem}.summary.md", output_dir / f"{stem}.corrections.md"]
+
+
+def sync_review_outputs(
+    input_path: Path,
+    output_dir: Path | None,
+    include_docx: bool,
+    include_html: bool,
+    overwrite: bool,
+) -> tuple[list[tuple[Path, bool]], list[str]]:
+    resolved_output_dir = output_dir or input_path.parent
+    results: list[tuple[Path, bool]] = []
+    warnings: list[str] = []
+
+    if review_kind_from_markdown(input_path):
+        synced, sync_warnings = sync_markdown_file(input_path, resolved_output_dir, include_docx, include_html, overwrite)
+        return synced, sync_warnings
+
+    if not input_path.exists():
+        return [], [f"Input file not found: {input_path}"]
+
+    for markdown_path in sibling_review_markdown_paths(input_path, resolved_output_dir):
+        if not markdown_path.exists():
+            warnings.append(f"Review Markdown not found, skipping sync: {markdown_path}")
+            continue
+        synced, sync_warnings = sync_markdown_file(markdown_path, resolved_output_dir, include_docx, include_html, overwrite)
+        results.extend(synced)
+        warnings.extend(sync_warnings)
+
+    return results, warnings
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Create Markdown, Word, and optional HTML review deliverables for a transcript."
     )
-    parser.add_argument("transcript", help="Path to a transcript file: txt, srt, vtt, tsv, or json.")
+    parser.add_argument("transcript", help="Path to a transcript file or review Markdown file.")
     parser.add_argument("--source-file", default="", help="Original media file path.")
     parser.add_argument("--output-dir", default=None, help="Directory for review outputs.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing review outputs.")
@@ -609,6 +882,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--html", action="store_true", help="Generate HTML outputs for summary and corrections.")
     parser.add_argument("--all", action="store_true", help="Generate Markdown, Word, and HTML outputs.")
     parser.add_argument("--markdown-only", action="store_true", help="Generate only Markdown outputs.")
+    parser.add_argument(
+        "--sync",
+        action="store_true",
+        help="Read existing *.summary.md/*.corrections.md and sync their current content to DOCX/HTML.",
+    )
     return parser
 
 
@@ -619,14 +897,35 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        include_docx = not args.no_docx and not args.markdown_only
+        include_html = (args.html or args.all) and not args.markdown_only
+
+        if args.sync:
+            if not args.html and not args.all and not args.markdown_only:
+                include_html = True
+            results, warnings = sync_review_outputs(
+                input_path=transcript_path,
+                output_dir=output_dir if args.output_dir else None,
+                include_docx=include_docx,
+                include_html=include_html,
+                overwrite=True if not args.overwrite else args.overwrite,
+            )
+            print("Review sync outputs:")
+            for path, written in results:
+                print(f"  {output_status(path, written)}: {path}")
+            for warning in warnings:
+                print(f"Warning: {warning}", file=sys.stderr)
+            if not results and warnings:
+                return 1
+            print("Best delivery files: use the synced .docx files for Word handoff, or .html files for web/Notion/Feishu copy.")
+            return 0
+
         if not transcript_path.exists():
             raise FileNotFoundError(f"Transcript not found: {transcript_path}")
         segments = read_transcript_segments(transcript_path)
         transcript = "\n".join(segment.text for segment in segments if segment.text).strip()
         stem = transcript_path.stem
         generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
-        include_docx = not args.no_docx and not args.markdown_only
-        include_html = (args.html or args.all) and not args.markdown_only
         output_formats = ["summary.md", "corrections.md"]
         if include_docx:
             output_formats.extend(["transcript.docx", "summary.docx", "corrections.docx"])

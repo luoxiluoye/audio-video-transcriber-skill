@@ -127,6 +127,126 @@ class PostprocessTest(unittest.TestCase):
         self.assertIn("--all", help_text)
         self.assertIn("--markdown-only", help_text)
         self.assertIn("--no-docx", help_text)
+        self.assertIn("--sync", help_text)
+
+    def test_syncs_completed_markdown_to_docx_and_html(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            summary = tmp_path / "meeting.summary.md"
+            summary.write_text(
+                "# 内容总结\n\n"
+                "Transcript: `/tmp/meeting.txt`\n\n"
+                "## 核心摘要\n\n"
+                "这是已经由 Agent 补全的核心摘要。\n\n"
+                "## 数据与信息分析\n\n"
+                "| 数据/信息 | 原文位置或上下文 | 可能含义 | 备注 |\n"
+                "| --- | --- | --- | --- |\n"
+                "| 20% | 收入增长20% | 增长明显 | 已核对 |\n",
+                encoding="utf-8",
+            )
+
+            result = module.main([str(summary), "--sync", "--all"])
+
+            self.assertEqual(result, 0)
+            synced_docx = tmp_path / "meeting.summary.docx"
+            synced_html = tmp_path / "meeting.summary.html"
+            self.assertTrue(synced_docx.exists())
+            self.assertTrue(synced_html.exists())
+            self.assertIn("已经由 Agent 补全", self.docx_text(synced_docx))
+            self.assertIn("已经由 Agent 补全", synced_html.read_text(encoding="utf-8"))
+            self.assertIn("收入增长20%", synced_html.read_text(encoding="utf-8"))
+
+    def test_syncs_corrections_markdown_to_docx_and_html(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            corrections = tmp_path / "meeting.corrections.md"
+            corrections.write_text(
+                "# 勘误与精修版\n\n"
+                "Transcript: `/tmp/meeting.txt`\n\n"
+                "## 疑似识别错误表\n\n"
+                "| 原句 | 疑似错词 | 建议修正 | 理由/上下文 | 置信度 |\n"
+                "| --- | --- | --- | --- | --- |\n"
+                "| 原句内容 | 错词 | 正词 | 上下文支持 | 高 |\n\n"
+                "## 精修后正文\n\n"
+                "这是已经精修后的正文。\n",
+                encoding="utf-8",
+            )
+
+            result = module.main([str(corrections), "--sync", "--all"])
+
+            self.assertEqual(result, 0)
+            synced_docx = tmp_path / "meeting.corrections.docx"
+            synced_html = tmp_path / "meeting.corrections.html"
+            self.assertTrue(synced_docx.exists())
+            self.assertTrue(synced_html.exists())
+            self.assertIn("已经精修后的正文", self.docx_text(synced_docx))
+            self.assertIn("已经精修后的正文", synced_html.read_text(encoding="utf-8"))
+
+    def test_sync_from_transcript_finds_sibling_markdown_files(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "meeting.txt"
+            transcript.write_text("原始转写", encoding="utf-8")
+            (tmp_path / "meeting.summary.md").write_text("# 内容总结\n\n已补全总结。", encoding="utf-8")
+            (tmp_path / "meeting.corrections.md").write_text("# 勘误与精修版\n\n已补全勘误。", encoding="utf-8")
+
+            result = module.main([str(transcript), "--sync", "--all"])
+
+            self.assertEqual(result, 0)
+            self.assertIn("已补全总结", self.docx_text(tmp_path / "meeting.summary.docx"))
+            self.assertIn("已补全勘误", self.docx_text(tmp_path / "meeting.corrections.docx"))
+
+    def test_missing_python_docx_does_not_block_markdown_or_html(self) -> None:
+        module = load_postprocess_module()
+
+        def missing_docx():
+            raise RuntimeError("python-docx is missing for test")
+
+        module.import_docx = missing_docx
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "meeting.txt"
+            output_dir = tmp_path / "out"
+            transcript.write_text("第一段内容。", encoding="utf-8")
+
+            result = module.main([str(transcript), "--output-dir", str(output_dir), "--html"])
+
+            self.assertEqual(result, 0)
+            self.assertTrue((output_dir / "meeting.summary.md").exists())
+            self.assertTrue((output_dir / "meeting.corrections.md").exists())
+            self.assertTrue((output_dir / "meeting.summary.html").exists())
+            self.assertTrue((output_dir / "meeting.corrections.html").exists())
+            self.assertFalse((output_dir / "meeting.summary.docx").exists())
+
+    def test_review_format_flags_control_outputs(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "meeting.txt"
+            transcript.write_text("第一段内容。", encoding="utf-8")
+
+            markdown_only_dir = tmp_path / "markdown-only"
+            result = module.main([str(transcript), "--output-dir", str(markdown_only_dir), "--markdown-only"])
+            self.assertEqual(result, 0)
+            self.assertTrue((markdown_only_dir / "meeting.summary.md").exists())
+            self.assertFalse((markdown_only_dir / "meeting.summary.docx").exists())
+            self.assertFalse((markdown_only_dir / "meeting.summary.html").exists())
+
+            html_only_dir = tmp_path / "html-only"
+            result = module.main([str(transcript), "--output-dir", str(html_only_dir), "--html", "--no-docx"])
+            self.assertEqual(result, 0)
+            self.assertTrue((html_only_dir / "meeting.summary.md").exists())
+            self.assertFalse((html_only_dir / "meeting.summary.docx").exists())
+            self.assertTrue((html_only_dir / "meeting.summary.html").exists())
+
+            all_dir = tmp_path / "all"
+            result = module.main([str(transcript), "--output-dir", str(all_dir), "--all"])
+            self.assertEqual(result, 0)
+            self.assertTrue((all_dir / "meeting.summary.docx").exists())
+            self.assertTrue((all_dir / "meeting.summary.html").exists())
 
 
 if __name__ == "__main__":

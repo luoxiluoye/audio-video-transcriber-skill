@@ -368,6 +368,11 @@ Every successful transcription creates a review pack next to the Whisper outputs
 
 The review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. Without Codex or another capable agent, the summary and corrections files are structured templates, not finished editorial analysis. In an agent workflow, ask the agent to read the transcript and complete the Markdown, Word, and optional HTML deliverables.
 
+There are two review commands:
+
+- `review` creates the initial review pack from a transcript.
+- `review-sync` reads the current `*.summary.md` and `*.corrections.md` content after a user or agent has edited them, then regenerates the matching DOCX/HTML deliverables from that finished Markdown.
+
 Create the review pack for an existing transcript:
 
 ```bash
@@ -392,6 +397,21 @@ Keep the old Markdown-only behavior:
 ./bin/avt review ~/AudioVideoTranscriber/output/test.txt --markdown-only
 ```
 
+After Codex or another agent fills the Markdown files, sync the final content to Word and HTML:
+
+```bash
+./bin/avt review-sync ~/AudioVideoTranscriber/output/test.summary.md
+./bin/avt review-sync ~/AudioVideoTranscriber/output/test.corrections.md
+```
+
+Or sync both sibling Markdown files from the transcript path:
+
+```bash
+./bin/avt review-sync ~/AudioVideoTranscriber/output/test.txt --all
+```
+
+`review-sync` overwrites the matching `*.summary.docx`, `*.corrections.docx`, `*.summary.html`, and `*.corrections.html` so they reflect the latest Markdown content.
+
 Skip review-pack generation for one transcription:
 
 ```bash
@@ -411,7 +431,17 @@ Word output uses the Python package `python-docx`. If it is missing, transcripti
 python -m pip install -U python-docx
 ```
 
+`./bin/avt doctor` prints the exact Python path it is checking and, when `python-docx` is missing, prints a copyable install command for that Python.
+
 HTML output is standalone: CSS is embedded in each file, so it can be opened directly or copied into web pages, Feishu Docs, Notion, or public-account drafts.
+
+### Typical Agent Workflow
+
+1. Run `./bin/avt transcribe ~/Desktop/test.mp4`.
+2. Let the agent read `~/AudioVideoTranscriber/output/test.txt`.
+3. Let the agent fill `test.summary.md` and `test.corrections.md`.
+4. Run `./bin/avt review-sync ~/AudioVideoTranscriber/output/test.txt --all`.
+5. Deliver `test.transcript.docx`, `test.summary.docx`, `test.corrections.docx`, or the HTML versions depending on where the user needs to paste/share the result.
 
 ## Automatic Inbox Watcher
 

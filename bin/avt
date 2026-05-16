@@ -14,6 +14,7 @@ Usage:
   ./bin/avt bootstrap
   ./bin/avt transcribe "/path/to/file.mp4" [transcribe options]
   ./bin/avt review "/path/to/transcript.txt" [--html|--all|--markdown-only]
+  ./bin/avt review-sync "/path/to/file.summary.md" [--all|--no-docx]
   ./bin/avt watch
   ./bin/avt test-watch "/path/to/file.mp4" [timeout_seconds]
   ./bin/avt stop
@@ -26,6 +27,7 @@ Examples:
   ./bin/avt transcribe ~/Desktop/test.mp4
   ./bin/avt transcribe ~/Desktop/test.mp4 --model medium --language auto
   ./bin/avt review ~/AudioVideoTranscriber/output/test.txt --all
+  ./bin/avt review-sync ~/AudioVideoTranscriber/output/test.summary.md
   ./bin/avt watch
   ./bin/avt test-watch ~/Desktop/test.mp4
   ./bin/avt stop
@@ -73,6 +75,17 @@ case "$COMMAND" in
       exit 1
     fi
     python3 "$SCRIPT_DIR/postprocess.py" "$@"
+    ;;
+  review-sync)
+    if [ "$#" -lt 1 ]; then
+      echo "Missing review Markdown or transcript file."
+      echo
+      echo "Examples:"
+      echo "  ./bin/avt review-sync \"$HOME/AudioVideoTranscriber/output/test.summary.md\""
+      echo "  ./bin/avt review-sync \"$HOME/AudioVideoTranscriber/output/test.txt\" --all"
+      exit 1
+    fi
+    python3 "$SCRIPT_DIR/postprocess.py" "$@" --sync
     ;;
   watch)
     "$SCRIPT_DIR/start_watcher.sh" "$@"

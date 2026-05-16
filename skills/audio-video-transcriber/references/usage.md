@@ -84,6 +84,21 @@ Create or refresh the review pack for an existing transcript:
 python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --overwrite
 ```
 
+After a user or agent edits `*.summary.md` and `*.corrections.md`, sync those finished Markdown files to final Word/HTML:
+
+```bash
+./bin/avt review-sync "/path/to/transcript.txt" --all
+```
+
+Sync just one edited Markdown file:
+
+```bash
+./bin/avt review-sync "/path/to/transcript.summary.md"
+./bin/avt review-sync "/path/to/transcript.corrections.md"
+```
+
+The sync command reads the current Markdown content and overwrites the matching DOCX/HTML deliverables with that content. It does not recreate the Markdown templates.
+
 Generate standalone HTML too:
 
 ```bash

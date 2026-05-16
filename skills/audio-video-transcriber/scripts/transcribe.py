@@ -195,8 +195,34 @@ def create_review_files(input_path: Path, output_dir: Path, overwrite: bool = Fa
     logging.info("Creating review files for %s", transcript_path)
     try:
         subprocess.run(command, check=True)
+        print_review_index(input_path, output_dir, transcript_path)
     except subprocess.CalledProcessError as exc:
         logging.warning("Could not create review files for %s: %s", transcript_path, exc)
+
+
+def print_review_index(input_path: Path, output_dir: Path, transcript_path: Path) -> None:
+    stem = input_path.stem
+    expected = [
+        ("原始转写稿", transcript_path),
+        ("Word 版全文稿", output_dir / f"{stem}.transcript.docx"),
+        ("总结稿 Markdown", output_dir / f"{stem}.summary.md"),
+        ("总结稿 Word", output_dir / f"{stem}.summary.docx"),
+        ("精修/纠错稿 Markdown", output_dir / f"{stem}.corrections.md"),
+        ("精修/纠错稿 Word", output_dir / f"{stem}.corrections.docx"),
+        ("总结稿 HTML", output_dir / f"{stem}.summary.html"),
+        ("精修/纠错稿 HTML", output_dir / f"{stem}.corrections.html"),
+    ]
+    print("Review pack index:")
+    for label, path in expected:
+        if path.exists():
+            print(f"  {label}: {path}")
+    direct_file = output_dir / f"{stem}.transcript.docx"
+    if not direct_file.exists():
+        direct_file = transcript_path
+    print(f"Best direct delivery file: {direct_file}")
+    print("Next step for Agent polish:")
+    print(f"  Ask the agent to read {transcript_path}, fill {output_dir / f'{stem}.summary.md'} and {output_dir / f'{stem}.corrections.md'}, then run:")
+    print(f"  ./bin/avt review-sync \"{transcript_path}\" --all")
 
 
 def run_whisper(

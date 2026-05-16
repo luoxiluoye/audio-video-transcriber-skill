@@ -79,6 +79,14 @@ if (-not $FfmpegPath) {
     Write-Host ""
 }
 
+if ($PythonPath -and (-not $PythonDocxStatus)) {
+    Write-Host "python-docx not found for the current Python:"
+    Write-Host "  $PythonPath"
+    Write-Host "Install it with:"
+    Write-Host "  & `"$PythonPath`" -m pip install -U python-docx"
+    Write-Host ""
+}
+
 Write-Host "Recommended next step:"
 if (-not $PythonPath) {
     Write-Host "  Install Python 3, then run this doctor again."
