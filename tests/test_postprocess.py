@@ -1,21 +1,34 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import sys
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stdout
 from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 POSTPROCESS_PATH = ROOT_DIR / "skills" / "audio-video-transcriber" / "scripts" / "postprocess.py"
+TRANSCRIBE_PATH = ROOT_DIR / "skills" / "audio-video-transcriber" / "scripts" / "transcribe.py"
 
 
 def load_postprocess_module():
     spec = importlib.util.spec_from_file_location("avt_postprocess", POSTPROCESS_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Could not load module from {POSTPROCESS_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load module from {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -247,6 +260,62 @@ class PostprocessTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertTrue((all_dir / "meeting.summary.docx").exists())
             self.assertTrue((all_dir / "meeting.summary.html").exists())
+
+    def test_initial_review_output_warns_that_summary_and_corrections_are_templates(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "meeting.txt"
+            output_dir = tmp_path / "out"
+            transcript.write_text("第一段内容。", encoding="utf-8")
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                result = module.main([str(transcript), "--output-dir", str(output_dir), "--html"])
+
+            self.assertEqual(result, 0)
+            output = stdout.getvalue()
+            self.assertIn("Initial review pack outputs", output)
+            self.assertIn("Initial summary draft/template", output)
+            self.assertIn("Initial corrections draft/template", output)
+            self.assertIn("not final analysis", output)
+            self.assertIn("review-sync", output)
+
+    def test_sync_output_labels_final_deliverables(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            summary = tmp_path / "meeting.summary.md"
+            summary.write_text("# 内容总结\n\n已补全总结。", encoding="utf-8")
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                result = module.main([str(summary), "--sync", "--all"])
+
+            self.assertEqual(result, 0)
+            output = stdout.getvalue()
+            self.assertIn("Review sync outputs", output)
+            self.assertIn("Final review deliverables", output)
+            self.assertIn("Word files for direct handoff", output)
+
+    def test_transcribe_review_index_marks_initial_templates(self) -> None:
+        module = load_module("avt_transcribe", TRANSCRIBE_PATH)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "meeting.txt"
+            transcript.write_text("转写内容", encoding="utf-8")
+            for name in ("meeting.transcript.docx", "meeting.summary.md", "meeting.summary.docx", "meeting.corrections.md", "meeting.corrections.docx"):
+                (tmp_path / name).write_text("placeholder", encoding="utf-8")
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                module.print_review_index(tmp_path / "meeting.mp4", tmp_path, transcript)
+
+            output = stdout.getvalue()
+            self.assertIn("Initial review pack index", output)
+            self.assertIn("Directly viewable transcript", output)
+            self.assertIn("initial drafts or templates", output)
+            self.assertIn("review-sync", output)
 
 
 if __name__ == "__main__":

@@ -212,16 +212,17 @@ def print_review_index(input_path: Path, output_dir: Path, transcript_path: Path
         ("总结稿 HTML", output_dir / f"{stem}.summary.html"),
         ("精修/纠错稿 HTML", output_dir / f"{stem}.corrections.html"),
     ]
-    print("Review pack index:")
+    print("Initial review pack index:")
     for label, path in expected:
         if path.exists():
             print(f"  {label}: {path}")
     direct_file = output_dir / f"{stem}.transcript.docx"
     if not direct_file.exists():
         direct_file = transcript_path
-    print(f"Best direct delivery file: {direct_file}")
-    print("Next step for Agent polish:")
-    print(f"  Ask the agent to read {transcript_path}, fill {output_dir / f'{stem}.summary.md'} and {output_dir / f'{stem}.corrections.md'}, then run:")
+    print(f"Directly viewable transcript: {direct_file}")
+    print("Important: summary/corrections files are initial drafts or templates until an Agent fills them.")
+    print("Next step for final summary/corrections:")
+    print(f"  Ask an Agent to read {transcript_path}, fill {output_dir / f'{stem}.summary.md'} and {output_dir / f'{stem}.corrections.md'}, then run:")
     print(f"  ./bin/avt review-sync \"{transcript_path}\" --all")
 
 

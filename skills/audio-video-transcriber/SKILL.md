@@ -64,9 +64,8 @@ python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
 After transcription, the script creates a local post-transcription review pack beside the Whisper outputs:
 
 - `*.transcript.docx`: complete transcript deliverable with title, source file name, generation time, transcript path, output format list, paragraphs, and timestamps when available.
-- `*.summary.md` and `*.summary.docx`: content-summary deliverables with core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary.
-- `*.corrections.md` and `*.corrections.docx`: correction deliverables with likely recognition errors, proper noun normalization, sentence polishing notes, and corrected text.
-- `*.summary.html` and `*.corrections.html`: optional standalone HTML deliverables when the user asks for HTML or all formats.
+- `*.summary.md`, `*.summary.docx`, and optional `*.summary.html`: initial content-summary drafts/templates until the agent fills `*.summary.md`.
+- `*.corrections.md`, `*.corrections.docx`, and optional `*.corrections.html`: initial correction/polishing drafts/templates until the agent fills `*.corrections.md`.
 
 The local scripts generate structured templates and Word/HTML shells. They do not call an LLM and do not pretend the summary/corrections are finished. If the user asks to "transcribe and summarize", "整理", "精修", or "生成纪要", the agent must continue after transcription:
 
@@ -76,9 +75,15 @@ The local scripts generate structured templates and Word/HTML shells. They do no
 4. Run `./bin/avt review-sync "/path/to/transcript.txt" --all` or `python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all` so the completed Markdown is converted into final DOCX/HTML.
 5. Tell the user where every output file is and which file is best for direct delivery.
 
+For "帮我转写并总结/精修" requests, do not stop after step 1 or after creating templates. Complete steps 1-5 in the same turn whenever possible. In the final answer, clearly label:
+
+- Complete transcript: `*.transcript.docx`
+- Initial templates, if not filled: `*.summary.md`, `*.corrections.md`
+- Final synced deliverables after agent work: `*.summary.docx`, `*.corrections.docx`, and HTML files when generated
+
 Do not rerun `postprocess.py --overwrite` after manually filling the summary/corrections unless you intend to reset the deliverables back to templates. Use `--sync` or `./bin/avt review-sync` to preserve the completed Markdown content while regenerating Word/HTML.
 
-If no local LLM API or capable agent is available, do not fail; leave the templates for a later agent pass. Do not upload transcripts or media files.
+If no local LLM API or capable agent is available, do not fail; say clearly that summary/corrections are initial templates and need a later agent pass. Do not upload transcripts or media files.
 
 When the user asks to create or refresh the review pack for an existing transcript, call:
 

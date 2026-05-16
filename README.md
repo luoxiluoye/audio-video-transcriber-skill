@@ -360,13 +360,13 @@ Every successful transcription creates a review pack next to the Whisper outputs
 <name>.corrections.docx
 ```
 
-`*.transcript.docx` is the complete transcript in a Word-friendly layout. It includes the source file name, generation time, transcript path, output formats, and paragraphs. When the input transcript has SRT/VTT/Whisper timestamps, the Word transcript preserves those time ranges.
+`*.transcript.docx` is the complete transcript in a Word-friendly layout and can be viewed directly after transcription. It includes the source file name, generation time, transcript path, output formats, and paragraphs. When the input transcript has SRT/VTT/Whisper timestamps, the Word transcript preserves those time ranges.
 
-`*.summary.md` and `*.summary.docx` are content-summary workspaces with sections for core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary.
+`*.summary.md`, `*.summary.docx`, and optional `*.summary.html` are initial summary drafts/templates until a user or Agent fills the Markdown with real analysis.
 
-`*.corrections.md` and `*.corrections.docx` are correction workspaces with tables for likely recognition errors, proper noun normalization, sentence polishing notes, and a corrected-text section.
+`*.corrections.md`, `*.corrections.docx`, and optional `*.corrections.html` are initial correction/polishing drafts/templates until a user or Agent fills the Markdown with real corrections.
 
-The review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. Without Codex or another capable agent, the summary and corrections files are structured templates, not finished editorial analysis. In an agent workflow, ask the agent to read the transcript and complete the Markdown, Word, and optional HTML deliverables.
+The initial review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. Without Codex or another capable agent, the summary and corrections files are structured templates, not finished editorial analysis.
 
 There are two review commands:
 
@@ -412,6 +412,8 @@ Or sync both sibling Markdown files from the transcript path:
 
 `review-sync` overwrites the matching `*.summary.docx`, `*.corrections.docx`, `*.summary.html`, and `*.corrections.html` so they reflect the latest Markdown content.
 
+After `review-sync`, the synced `*.summary.docx`, `*.corrections.docx`, `*.summary.html`, and `*.corrections.html` are the final review deliverables because they are rendered from the completed Markdown.
+
 Skip review-pack generation for one transcription:
 
 ```bash
@@ -442,6 +444,8 @@ HTML output is standalone: CSS is embedded in each file, so it can be opened dir
 3. Let the agent fill `test.summary.md` and `test.corrections.md`.
 4. Run `./bin/avt review-sync ~/AudioVideoTranscriber/output/test.txt --all`.
 5. Deliver `test.transcript.docx`, `test.summary.docx`, `test.corrections.docx`, or the HTML versions depending on where the user needs to paste/share the result.
+
+If the user asks an Agent to "transcribe and summarize" or "转写并总结/精修", the Agent should complete all five steps in one flow instead of stopping after the initial templates are created.
 
 ## Automatic Inbox Watcher
 

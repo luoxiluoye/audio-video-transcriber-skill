@@ -232,6 +232,38 @@ def output_status(path: Path, written: bool) -> str:
     return "written" if written else "exists"
 
 
+def print_initial_review_guidance(transcript_path: Path, output_dir: Path, stem: str, include_html: bool) -> None:
+    print("Initial review pack guidance:")
+    transcript_docx = output_dir / f"{stem}.transcript.docx"
+    direct_transcript = transcript_docx if transcript_docx.exists() else transcript_path
+    print(f"  Directly viewable transcript: {direct_transcript}")
+    print(f"  Initial summary draft/template: {output_dir / f'{stem}.summary.md'}")
+    print(f"  Initial corrections draft/template: {output_dir / f'{stem}.corrections.md'}")
+    if include_html:
+        print(f"  Initial summary HTML/template: {output_dir / f'{stem}.summary.html'}")
+        print(f"  Initial corrections HTML/template: {output_dir / f'{stem}.corrections.html'}")
+    print("  The summary/corrections DOCX/HTML files are not final analysis until an Agent or user completes the Markdown.")
+    print("Next step for final deliverables:")
+    print(f"  Fill {output_dir / f'{stem}.summary.md'} and {output_dir / f'{stem}.corrections.md'}, then run:")
+    print(f"  ./bin/avt review-sync \"{transcript_path}\" --all")
+
+
+def print_sync_guidance(results: list[tuple[Path, bool]]) -> None:
+    docx_files = [path for path, _ in results if path.suffix.lower() == ".docx"]
+    html_files = [path for path, _ in results if path.suffix.lower() == ".html"]
+    print("Final review deliverables:")
+    if docx_files:
+        print("  Word files for direct handoff:")
+        for path in docx_files:
+            print(f"    {path}")
+    if html_files:
+        print("  HTML files for web/Notion/Feishu copy:")
+        for path in html_files:
+            print(f"    {path}")
+    if not docx_files and not html_files:
+        print("  No final DOCX/HTML files were written.")
+
+
 def build_info_lines(transcript_path: Path, source_file: str, generated_at: str, output_formats: list[str]) -> list[str]:
     return [
         f"原始文件名：{Path(source_file).name if source_file else 'unknown'}",
@@ -917,7 +949,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Warning: {warning}", file=sys.stderr)
             if not results and warnings:
                 return 1
-            print("Best delivery files: use the synced .docx files for Word handoff, or .html files for web/Notion/Feishu copy.")
+            print_sync_guidance(results)
             return 0
 
         if not transcript_path.exists():
@@ -1026,13 +1058,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
 
-        print("Post-processing deliverables:")
+        print("Initial review pack outputs:")
         for path, written in results:
             print(f"  {output_status(path, written)}: {path}")
         if warnings:
             for warning in warnings:
                 print(f"Warning: {warning}", file=sys.stderr)
-        print("Next step: if you are using Codex or another agent, ask it to read the transcript and complete the summary/corrections deliverables.")
+        print_initial_review_guidance(transcript_path, output_dir, stem, include_html)
         return 0
     except Exception as exc:  # noqa: BLE001 - CLI should print friendly errors.
         print(f"Error: {exc}", file=sys.stderr)

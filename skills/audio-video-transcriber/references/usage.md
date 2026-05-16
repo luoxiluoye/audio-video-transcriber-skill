@@ -74,7 +74,7 @@ By default, each transcription creates:
 <name>.corrections.docx
 ```
 
-The transcript Word file is a complete transcript deliverable. The summary files ask an agent to fill in core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary. The corrections files ask an agent to identify likely recognition errors, normalize proper nouns, explain sentence polishing, and produce corrected text.
+The transcript Word file is a complete transcript deliverable. The summary and corrections files are initial drafts/templates until a user or agent fills the Markdown. The summary files ask an agent to fill in core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary. The corrections files ask an agent to identify likely recognition errors, normalize proper nouns, explain sentence polishing, and produce corrected text.
 
 If no local LLM API or capable agent is available, these files are still useful structured templates. They contain the transcript path and clear task instructions.
 
@@ -98,6 +98,8 @@ Sync just one edited Markdown file:
 ```
 
 The sync command reads the current Markdown content and overwrites the matching DOCX/HTML deliverables with that content. It does not recreate the Markdown templates.
+
+After sync, the Word/HTML summary and correction files are final deliverables rendered from the completed Markdown.
 
 Generate standalone HTML too:
 
