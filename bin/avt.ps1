@@ -19,7 +19,7 @@ Usage:
   .\bin\avt.ps1 install
   .\bin\avt.ps1 bootstrap
   .\bin\avt.ps1 transcribe "C:\path\to\file.mp4" [transcribe options]
-  .\bin\avt.ps1 review "C:\path\to\transcript.txt" [--html|--all|--markdown-only]
+  .\bin\avt.ps1 review "C:\path\to\transcript.txt" [--kind summary|corrections|publish|meeting-notes] [--all]
   .\bin\avt.ps1 review-sync "C:\path\to\file.summary.md" [--all|--no-docx]
   .\bin\avt.ps1 watch
   .\bin\avt.ps1 stop
@@ -31,7 +31,8 @@ Examples:
   .\bin\avt.ps1 bootstrap
   .\bin\avt.ps1 transcribe "$env:USERPROFILE\Desktop\test.mp4"
   .\bin\avt.ps1 transcribe "$env:USERPROFILE\Desktop\test.mp4" --model medium --language auto
-  .\bin\avt.ps1 review "$env:USERPROFILE\AudioVideoTranscriber\output\test.txt" --all
+  .\bin\avt.ps1 review "$env:USERPROFILE\AudioVideoTranscriber\output\test.txt" --kind summary --all
+  .\bin\avt.ps1 review "$env:USERPROFILE\AudioVideoTranscriber\output\test.txt" --kind publish --all
   .\bin\avt.ps1 review-sync "$env:USERPROFILE\AudioVideoTranscriber\output\test.summary.md"
   .\bin\avt.ps1 watch
   .\bin\avt.ps1 stop
@@ -61,7 +62,7 @@ switch ($Command.ToLowerInvariant()) {
     }
     "review" {
         if ($RemainingArgs.Count -lt 1) {
-            Write-Error "Missing transcript file. Example: .\bin\avt.ps1 review `"$env:USERPROFILE\AudioVideoTranscriber\output\test.txt`""
+            Write-Error "Missing transcript file. Example: .\bin\avt.ps1 review `"$env:USERPROFILE\AudioVideoTranscriber\output\test.txt`" --kind summary --all"
             exit 1
         }
         $python = if ($env:AVT_PYTHON_BIN) { $env:AVT_PYTHON_BIN } else { "python" }

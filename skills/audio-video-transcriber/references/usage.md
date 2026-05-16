@@ -5,19 +5,19 @@ This reference gives examples for using the Codex skill and bundled scripts.
 ## Codex Examples
 
 ```text
-Use $audio-video-transcriber to transcribe ~/Desktop/interview.mp4
+帮我转写这个音频：/Users/a26573/Desktop/test.m4a
 ```
 
 ```text
-Use $audio-video-transcriber to start an automatic transcription inbox.
+帮我转写这个音频，并整理成内容总结版：/Users/a26573/Desktop/test.m4a
 ```
 
 ```text
-Use $audio-video-transcriber to check my Whisper transcription setup.
+帮我把这个采访录音转写出来，再整理成刊物发布版：/Users/a26573/Desktop/interview.m4a
 ```
 
 ```text
-Use $audio-video-transcriber to stop automatic transcription.
+帮我转写这个会议录音，并整理成会议纪要：/Users/a26573/Desktop/meeting.m4a
 ```
 
 ## Single File Transcription
@@ -50,7 +50,7 @@ With a custom output directory:
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --output-dir "$HOME/transcripts"
 ```
 
-Skip the review pack:
+Skip the transcript Word file:
 
 ```bash
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --no-review
@@ -62,29 +62,43 @@ Move the source file to `done` after success:
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --move-done
 ```
 
-## Post-Transcription Review Pack
+## Progressive Deliverables
 
-By default, each transcription creates:
+By default, each transcription creates the raw transcript and:
 
 ```text
 <name>.transcript.docx
-<name>.summary.md
-<name>.summary.docx
-<name>.corrections.md
-<name>.corrections.docx
 ```
 
-The transcript Word file is a complete transcript deliverable. The summary and corrections files are initial drafts/templates until a user or agent fills the Markdown. The summary files ask an agent to fill in core summary, key content, key viewpoints, action items, timeline, data and information analysis, and highlight summary. The corrections files ask an agent to identify likely recognition errors, normalize proper nouns, explain sentence polishing, and produce corrected text.
+The transcript Word file is a complete transcript deliverable. Summary, correction, publish, meeting-note, and HTML files are created only when the user asks for those extra versions.
 
-If no local LLM API or capable agent is available, these files are still useful structured templates. They contain the transcript path and clear task instructions.
+Output files use the media stem as a prefix, for example `avt-watch-test-10s.summary.docx`, not a bare `summary.docx`.
 
-Create or refresh the review pack for an existing transcript:
+Create a content summary:
 
 ```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --overwrite
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind summary --all
 ```
 
-After a user or agent edits `*.summary.md` and `*.corrections.md`, sync those finished Markdown files to final Word/HTML:
+Create a correction/polishing version:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind corrections --all
+```
+
+Create a publishable article draft:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind publish --all
+```
+
+Create meeting notes:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind meeting-notes --all
+```
+
+After a user or agent edits the generated Markdown, sync finished Markdown files to final Word/HTML:
 
 ```bash
 ./bin/avt review-sync "/path/to/transcript.txt" --all
@@ -95,28 +109,8 @@ Sync just one edited Markdown file:
 ```bash
 ./bin/avt review-sync "/path/to/transcript.summary.md"
 ./bin/avt review-sync "/path/to/transcript.corrections.md"
-```
-
-The sync command reads the current Markdown content and overwrites the matching DOCX/HTML deliverables with that content. It does not recreate the Markdown templates.
-
-After sync, the Word/HTML summary and correction files are final deliverables rendered from the completed Markdown.
-
-Generate standalone HTML too:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
-```
-
-Generate every supported review format:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --all
-```
-
-Keep Markdown only:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --markdown-only
+./bin/avt review-sync "/path/to/transcript.publish.md"
+./bin/avt review-sync "/path/to/transcript.meeting-notes.md"
 ```
 
 ## Automatic Inbox Watcher

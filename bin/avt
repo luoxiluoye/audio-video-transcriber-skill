@@ -13,7 +13,7 @@ Usage:
   ./bin/avt install
   ./bin/avt bootstrap
   ./bin/avt transcribe "/path/to/file.mp4" [transcribe options]
-  ./bin/avt review "/path/to/transcript.txt" [--html|--all|--markdown-only]
+  ./bin/avt review "/path/to/transcript.txt" [--kind summary|corrections|publish|meeting-notes] [--all]
   ./bin/avt review-sync "/path/to/file.summary.md" [--all|--no-docx]
   ./bin/avt watch
   ./bin/avt test-watch "/path/to/file.mp4" [timeout_seconds]
@@ -26,7 +26,8 @@ Examples:
   ./bin/avt bootstrap
   ./bin/avt transcribe ~/Desktop/test.mp4
   ./bin/avt transcribe ~/Desktop/test.mp4 --model medium --language auto
-  ./bin/avt review ~/AudioVideoTranscriber/output/test.txt --all
+  ./bin/avt review ~/AudioVideoTranscriber/output/test.txt --kind summary --all
+  ./bin/avt review ~/AudioVideoTranscriber/output/test.txt --kind publish --all
   ./bin/avt review-sync ~/AudioVideoTranscriber/output/test.summary.md
   ./bin/avt watch
   ./bin/avt test-watch ~/Desktop/test.mp4
@@ -71,7 +72,7 @@ case "$COMMAND" in
       echo "Missing transcript file."
       echo
       echo "Example:"
-      echo "  ./bin/avt review \"$HOME/AudioVideoTranscriber/output/test.txt\""
+      echo "  ./bin/avt review \"$HOME/AudioVideoTranscriber/output/test.txt\" --kind summary --all"
       exit 1
     fi
     python3 "$SCRIPT_DIR/postprocess.py" "$@"

@@ -18,8 +18,9 @@ This project works even without Codex. Codex Plugin / Skill is one integration l
 - Local processing: audio and video files are not uploaded.
 - Supports audio and video: `mp3`, `wav`, `m4a`, `aac`, `flac`, `mp4`, `mov`, `mkv`, `avi`, `webm`.
 - Outputs Whisper formats such as `txt`, `srt`, `vtt`, `json`, and `tsv`.
-- Creates a post-transcription review pack: `*.transcript.docx`, `*.summary.md`, `*.summary.docx`, `*.corrections.md`, and `*.corrections.docx`.
-- Optionally creates handoff-friendly HTML: `*.summary.html` and `*.corrections.html`.
+- Creates an original transcript plus `*.transcript.docx` by default.
+- Progressively creates summary, correction, publish, and meeting-note deliverables only when requested.
+- Optionally creates handoff-friendly HTML such as `*.summary.html`, `*.corrections.html`, `*.publish.html`, and `*.meeting-notes.html`.
 - Single-file transcription.
 - Inbox watcher workflow for automatic local transcription.
 - Auto-detects an existing local Whisper CLI.
@@ -63,6 +64,28 @@ Use the universal CLI entrypoint from the repository root:
 
 The CLI does not depend on Codex. It is a thin wrapper over the same local scripts used by the Codex Skill and MCP server.
 
+## Natural Codex Examples
+
+Most users do not need to know the CLI commands. In Codex, ask naturally:
+
+```text
+帮我转写这个音频：/Users/a26573/Desktop/test.m4a
+```
+
+```text
+帮我转写这个音频，并整理成内容总结版：/Users/a26573/Desktop/test.m4a
+```
+
+```text
+帮我把这个采访录音转写出来，再整理成刊物发布版：/Users/a26573/Desktop/interview.m4a
+```
+
+```text
+帮我转写这个会议录音，并整理成会议纪要：/Users/a26573/Desktop/meeting.m4a
+```
+
+If you only ask for transcription, Codex should stop after the original transcript and `*.transcript.docx`, then offer to continue with a summary, correction pass, publishable article, meeting notes, or a cleaned verbatim transcript.
+
 On Windows PowerShell, use:
 
 ```powershell
@@ -86,7 +109,7 @@ python skills/audio-video-transcriber/scripts/transcribe.py "path/to/file.mp4"
 Clone this repository:
 
 ```bash
-git clone https://github.com/YOUR-USER/audio-video-transcriber-skill.git
+git clone https://github.com/luoxiluoye/audio-video-transcriber-skill.git
 cd audio-video-transcriber-skill
 ```
 
@@ -348,79 +371,98 @@ Use automatic language detection:
 ./bin/avt transcribe ~/Desktop/test.mp4 --language auto
 ```
 
-## Post-Transcription Review Pack
+## Progressive Deliverables
 
-Every successful transcription creates a review pack next to the Whisper outputs:
+Every successful transcription creates the original transcript next to the Whisper outputs:
 
 ```text
 <name>.transcript.docx
-<name>.summary.md
-<name>.summary.docx
-<name>.corrections.md
-<name>.corrections.docx
 ```
 
 `*.transcript.docx` is the complete transcript in a Word-friendly layout and can be viewed directly after transcription. It includes the source file name, generation time, transcript path, output formats, and paragraphs. When the input transcript has SRT/VTT/Whisper timestamps, the Word transcript preserves those time ranges.
 
-`*.summary.md`, `*.summary.docx`, and optional `*.summary.html` are initial summary drafts/templates until a user or Agent fills the Markdown with real analysis.
+By default, `transcribe` does not force summary, correction, publish, meeting-note, or HTML files. That keeps the first result simple for users who only asked for transcription.
 
-`*.corrections.md`, `*.corrections.docx`, and optional `*.corrections.html` are initial correction/polishing drafts/templates until a user or Agent fills the Markdown with real corrections.
+When the user asks for extra整理, create only the requested deliverable:
 
-The initial review pack is local and deterministic. It does not call an LLM API or upload media/transcripts. Without Codex or another capable agent, the summary and corrections files are structured templates, not finished editorial analysis.
-
-There are two review commands:
-
-- `review` creates the initial review pack from a transcript.
-- `review-sync` reads the current `*.summary.md` and `*.corrections.md` content after a user or agent has edited them, then regenerates the matching DOCX/HTML deliverables from that finished Markdown.
-
-Create the review pack for an existing transcript:
-
-```bash
-./bin/avt review ~/AudioVideoTranscriber/output/test.txt
+```text
+<name>.summary.md
+<name>.summary.docx
+<name>.summary.html
+<name>.corrections.md
+<name>.corrections.docx
+<name>.corrections.html
+<name>.publish.md
+<name>.publish.docx
+<name>.publish.html
+<name>.meeting-notes.md
+<name>.meeting-notes.docx
+<name>.meeting-notes.html
 ```
 
-Generate HTML versions too:
+Actual output files use the audio/video stem as a prefix; they are not bare filenames. For example, `avt-watch-test-10s.m4a` produces names such as:
 
-```bash
-./bin/avt review ~/AudioVideoTranscriber/output/test.txt --html
+```text
+avt-watch-test-10s.transcript.docx
+avt-watch-test-10s.summary.md
+avt-watch-test-10s.summary.docx
+avt-watch-test-10s.corrections.md
+avt-watch-test-10s.corrections.docx
+avt-watch-test-10s.publish.docx
 ```
 
-Generate every supported review format:
+Create only a content summary for an existing transcript:
 
 ```bash
-./bin/avt review ~/AudioVideoTranscriber/output/test.txt --all
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --kind summary --all
 ```
 
-Keep the old Markdown-only behavior:
+Create only a correction/polishing draft:
 
 ```bash
-./bin/avt review ~/AudioVideoTranscriber/output/test.txt --markdown-only
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --kind corrections --all
 ```
+
+Create a publishable article draft:
+
+```bash
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --kind publish --all
+```
+
+Create meeting notes:
+
+```bash
+./bin/avt review ~/AudioVideoTranscriber/output/test.txt --kind meeting-notes --all
+```
+
+`review` creates a structured Markdown draft and matching Word/HTML shells. Codex should read the transcript, fill the Markdown with real content, then run `review-sync` so the final Word/HTML reflects the completed Markdown.
 
 After Codex or another agent fills the Markdown files, sync the final content to Word and HTML:
 
 ```bash
 ./bin/avt review-sync ~/AudioVideoTranscriber/output/test.summary.md
 ./bin/avt review-sync ~/AudioVideoTranscriber/output/test.corrections.md
+./bin/avt review-sync ~/AudioVideoTranscriber/output/test.publish.md
+./bin/avt review-sync ~/AudioVideoTranscriber/output/test.meeting-notes.md
 ```
 
-Or sync both sibling Markdown files from the transcript path:
+Or sync every existing sibling Markdown file from the transcript path:
 
 ```bash
 ./bin/avt review-sync ~/AudioVideoTranscriber/output/test.txt --all
 ```
 
-`review-sync` overwrites the matching `*.summary.docx`, `*.corrections.docx`, `*.summary.html`, and `*.corrections.html` so they reflect the latest Markdown content.
+`review-sync` overwrites the matching DOCX/HTML files so they reflect the latest Markdown content.
 
-After `review-sync`, the synced `*.summary.docx`, `*.corrections.docx`, `*.summary.html`, and `*.corrections.html` are the final review deliverables because they are rendered from the completed Markdown.
+After `review-sync`, the synced DOCX/HTML files are the final deliverables because they are rendered from the completed Markdown.
 
-Skip review-pack generation for one transcription:
+Skip transcript Word generation for one transcription:
 
 ```bash
 ./bin/avt transcribe ~/Desktop/test.mp4 --no-review
 ```
 
-Overwrite existing review files:
+Overwrite existing generated files:
 
 ```bash
 ./bin/avt transcribe ~/Desktop/test.mp4 --overwrite-review
@@ -440,12 +482,12 @@ HTML output is standalone: CSS is embedded in each file, so it can be opened dir
 ### Typical Agent Workflow
 
 1. Run `./bin/avt transcribe ~/Desktop/test.mp4`.
-2. Let the agent read `~/AudioVideoTranscriber/output/test.txt`.
-3. Let the agent fill `test.summary.md` and `test.corrections.md`.
-4. Run `./bin/avt review-sync ~/AudioVideoTranscriber/output/test.txt --all`.
-5. Deliver `test.transcript.docx`, `test.summary.docx`, `test.corrections.docx`, or the HTML versions depending on where the user needs to paste/share the result.
+2. If the user only asked for transcription, deliver `test.transcript.docx` and offer next-step整理 options.
+3. If the user asked for a summary, correction pass, publishable article, or meeting notes, let the agent read `~/AudioVideoTranscriber/output/test.txt`.
+4. Create only the requested Markdown kind, fill it, then run `./bin/avt review-sync ~/AudioVideoTranscriber/output/test.txt --all`.
+5. Deliver the requested final DOCX/HTML files and explain their intended use in plain language.
 
-If the user asks an Agent to "transcribe and summarize" or "转写并总结/精修", the Agent should complete all five steps in one flow instead of stopping after the initial templates are created.
+If the user asks an Agent to "transcribe and summarize", "转写并总结", "精修", "刊物发布版", or "会议纪要", the Agent should complete the requested整理 in one flow instead of stopping after the Markdown shell is created.
 
 ## Automatic Inbox Watcher
 
@@ -481,7 +523,7 @@ Default directories:
 ~/AudioVideoTranscriber/logs
 ```
 
-The default output folder contains Whisper outputs such as `json`, `srt`, `tsv`, `txt`, and `vtt`, plus review-pack files such as `*.transcript.docx`, `*.summary.md`, `*.summary.docx`, `*.corrections.md`, and `*.corrections.docx`.
+The default output folder contains Whisper outputs such as `json`, `srt`, `tsv`, `txt`, and `vtt`, plus `*.transcript.docx`. Requested extra versions appear beside them, for example `*.summary.docx`, `*.corrections.docx`, `*.publish.docx`, or `*.meeting-notes.docx`.
 
 Change them with:
 

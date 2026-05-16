@@ -141,6 +141,8 @@ class PostprocessTest(unittest.TestCase):
         self.assertIn("--markdown-only", help_text)
         self.assertIn("--no-docx", help_text)
         self.assertIn("--sync", help_text)
+        self.assertIn("--transcript-only", help_text)
+        self.assertIn("--kind", help_text)
 
     def test_syncs_completed_markdown_to_docx_and_html(self) -> None:
         module = load_postprocess_module()
@@ -261,6 +263,27 @@ class PostprocessTest(unittest.TestCase):
             self.assertTrue((all_dir / "meeting.summary.docx").exists())
             self.assertTrue((all_dir / "meeting.summary.html").exists())
 
+    def test_transcript_only_creates_only_transcript_docx(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "meeting.txt"
+            output_dir = tmp_path / "out"
+            transcript.write_text("第一段内容。", encoding="utf-8")
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                result = module.main([str(transcript), "--output-dir", str(output_dir), "--transcript-only"])
+
+            self.assertEqual(result, 0)
+            self.assertTrue((output_dir / "meeting.transcript.docx").exists())
+            self.assertFalse((output_dir / "meeting.summary.md").exists())
+            self.assertFalse((output_dir / "meeting.corrections.md").exists())
+            output = stdout.getvalue()
+            self.assertIn("Transcript outputs", output)
+            self.assertIn("原始转写稿", output)
+            self.assertIn("内容总结版", output)
+
     def test_initial_review_output_warns_that_summary_and_corrections_are_templates(self) -> None:
         module = load_postprocess_module()
         with tempfile.TemporaryDirectory() as tmp:
@@ -275,10 +298,10 @@ class PostprocessTest(unittest.TestCase):
 
             self.assertEqual(result, 0)
             output = stdout.getvalue()
-            self.assertIn("Initial review pack outputs", output)
-            self.assertIn("Initial summary draft/template", output)
-            self.assertIn("Initial corrections draft/template", output)
-            self.assertIn("not final analysis", output)
+            self.assertIn("Review draft outputs", output)
+            self.assertIn("内容总结 Markdown", output)
+            self.assertIn("勘误与精修版 Markdown", output)
+            self.assertIn("draft shells", output)
             self.assertIn("review-sync", output)
 
     def test_sync_output_labels_final_deliverables(self) -> None:
@@ -295,27 +318,44 @@ class PostprocessTest(unittest.TestCase):
             self.assertEqual(result, 0)
             output = stdout.getvalue()
             self.assertIn("Review sync outputs", output)
-            self.assertIn("Final review deliverables", output)
+            self.assertIn("Final deliverables", output)
             self.assertIn("Word files for direct handoff", output)
 
-    def test_transcribe_review_index_marks_initial_templates(self) -> None:
+    def test_transcribe_index_marks_transcript_and_next_steps(self) -> None:
         module = load_module("avt_transcribe", TRANSCRIBE_PATH)
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             transcript = tmp_path / "meeting.txt"
             transcript.write_text("转写内容", encoding="utf-8")
-            for name in ("meeting.transcript.docx", "meeting.summary.md", "meeting.summary.docx", "meeting.corrections.md", "meeting.corrections.docx"):
-                (tmp_path / name).write_text("placeholder", encoding="utf-8")
+            (tmp_path / "meeting.transcript.docx").write_text("placeholder", encoding="utf-8")
             stdout = io.StringIO()
 
             with redirect_stdout(stdout):
-                module.print_review_index(tmp_path / "meeting.mp4", tmp_path, transcript)
+                module.print_transcript_index(tmp_path / "meeting.mp4", tmp_path, transcript)
 
             output = stdout.getvalue()
-            self.assertIn("Initial review pack index", output)
+            self.assertIn("Transcription delivery", output)
             self.assertIn("Directly viewable transcript", output)
-            self.assertIn("initial drafts or templates", output)
-            self.assertIn("review-sync", output)
+            self.assertIn("内容总结版", output)
+            self.assertIn("刊物发布版", output)
+
+    def test_creates_publish_deliverables_when_requested(self) -> None:
+        module = load_postprocess_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            transcript = tmp_path / "interview.txt"
+            output_dir = tmp_path / "out"
+            transcript.write_text("这是采访内容。核心观点需要保留。", encoding="utf-8")
+
+            result = module.main([str(transcript), "--output-dir", str(output_dir), "--kind", "publish", "--all"])
+
+            self.assertEqual(result, 0)
+            self.assertTrue((output_dir / "interview.publish.md").exists())
+            self.assertTrue((output_dir / "interview.publish.docx").exists())
+            self.assertTrue((output_dir / "interview.publish.html").exists())
+            publish = (output_dir / "interview.publish.md").read_text(encoding="utf-8")
+            self.assertIn("刊物发布版", publish)
+            self.assertIn("不得编造事实", publish)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ Use this skill to transcribe local audio or video files with a local Whisper CLI
 - Do not run `sudo`.
 - Do not edit shell startup files such as `~/.zshrc` or `~/.bashrc` unless the user explicitly agrees.
 - If system dependencies are missing, show commands for the user to run instead of installing them automatically.
+- Treat transcription and editorial整理 as progressive deliverables. Do not create summaries, corrections, HTML, publish drafts, or meeting notes unless the user asks for that extra整理.
 
 ## Configuration
 
@@ -45,13 +46,148 @@ Defaults:
 - Logs: `~/AudioVideoTranscriber/logs`
 - Model: `small`
 - Language: `Chinese`
-- Output format: `all`
-- Review pack: enabled by default, creates `*.transcript.docx`, `*.summary.md`, `*.summary.docx`, `*.corrections.md`, and `*.corrections.docx`
-- Optional review HTML: use `--html` or `--all` to create `*.summary.html` and `*.corrections.html`
+- Whisper output format: `all`
+- Default Codex delivery: original transcript plus `*.transcript.docx`
 
 Supported extensions: `mp3`, `wav`, `m4a`, `aac`, `flac`, `mp4`, `mov`, `mkv`, `avi`, `webm`.
 
 If the user asks for English, pass `--language English`. If the user asks for automatic language detection, use `--language auto`, which makes `transcribe.py` omit Whisper's `--language` argument.
+
+## Progressive Workflow
+
+### 1. User only asks to transcribe
+
+When the user says something like:
+
+```text
+帮我转写这个音频：/path/to/audio.m4a
+```
+
+Do this:
+
+1. Check the environment with `doctor.sh`.
+2. Transcribe the file.
+3. Generate the raw transcript and `*.transcript.docx`.
+4. Stop there unless the user asked for extra整理.
+5. Reply in plain language:
+
+```text
+我已完成原始转写稿，文件在……。这版保留了口语表达和原始顺序。
+如果需要，我还可以继续整理成：内容总结版、勘误精修版、刊物发布版、会议纪要版或逐字稿清洁版。
+```
+
+Command:
+
+```bash
+./skills/audio-video-transcriber/scripts/doctor.sh
+python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/audio.m4a"
+```
+
+Do not automatically generate `summary`, `corrections`, `publish`, `meeting-notes`, or HTML for this default case.
+
+### 2. User asks for summary or key points
+
+Trigger words include: `总结`, `内容总结`, `提炼`, `要点`, `快速浏览`, `汇报`.
+
+After transcription:
+
+1. Read the transcript.
+2. Create and fill `*.summary.md` with a real content summary.
+3. Sync it to `*.summary.docx` and `*.summary.html`.
+4. Tell the user this is the "内容总结版", suitable for quick reading and reporting.
+
+Use:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind summary --all
+```
+
+Then fill `*.summary.md` yourself from the transcript and sync:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all
+```
+
+### 3. User asks for correction or a smoother transcript
+
+Trigger words include: `精修`, `勘误`, `纠错`, `通顺`, `整理成通顺版本`, `清洁版`.
+
+After transcription:
+
+1. Read the transcript.
+2. Create and fill `*.corrections.md`.
+3. Fix common口误, repeated words, typos, and obvious ASR errors.
+4. Preserve the original meaning and avoid over-rewriting.
+5. Sync to `*.corrections.docx` and `*.corrections.html`.
+6. Tell the user this is the "勘误精修版", suitable for comparing against the original transcript.
+
+Use:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind corrections --all
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all
+```
+
+### 4. User asks for a publishable article
+
+Trigger words include: `刊物版`, `公众号版`, `发布版`, `可发布稿`, `可读稿`, `文章`.
+
+After transcription:
+
+1. Read the transcript.
+2. Create and fill `*.publish.md`.
+3. Turn the transcript into a natural, coherent article with paragraphs.
+4. Preserve the speaker's core viewpoints.
+5. Add light transitions only when needed. Do not invent facts.
+6. Sync to `*.publish.docx` and `*.publish.html`.
+7. Tell the user this is the "刊物发布版", suitable for human review before publication.
+
+Use:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind publish --all
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all
+```
+
+### 5. User asks for meeting notes or a report version
+
+Trigger words include: `会议纪要`, `纪要`, `汇报版`, `汇报材料`, `待办事项`, `后续动作`.
+
+After transcription:
+
+1. Read the transcript.
+2. Create and fill `*.meeting-notes.md`.
+3. Extract the meeting topic, core viewpoints, action items, risks, and next steps.
+4. Sync to `*.meeting-notes.docx` and `*.meeting-notes.html`.
+5. Tell the user this is the "会议纪要版".
+
+Use:
+
+```bash
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind meeting-notes --all
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all
+```
+
+## File Naming
+
+Actual output files use the source media stem as a prefix. They are not bare names.
+
+Examples for `/path/to/avt-watch-test-10s.m4a`:
+
+- `avt-watch-test-10s.txt`
+- `avt-watch-test-10s.transcript.docx`
+- `avt-watch-test-10s.summary.md`
+- `avt-watch-test-10s.summary.docx`
+- `avt-watch-test-10s.summary.html`
+- `avt-watch-test-10s.corrections.md`
+- `avt-watch-test-10s.corrections.docx`
+- `avt-watch-test-10s.corrections.html`
+- `avt-watch-test-10s.publish.md`
+- `avt-watch-test-10s.publish.docx`
+- `avt-watch-test-10s.publish.html`
+- `avt-watch-test-10s.meeting-notes.md`
+- `avt-watch-test-10s.meeting-notes.docx`
+- `avt-watch-test-10s.meeting-notes.html`
 
 ## Command Routing
 
@@ -61,49 +197,16 @@ When the user asks to transcribe a specific file, call:
 python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
 ```
 
-After transcription, the script creates a local post-transcription review pack beside the Whisper outputs:
-
-- `*.transcript.docx`: complete transcript deliverable with title, source file name, generation time, transcript path, output format list, paragraphs, and timestamps when available.
-- `*.summary.md`, `*.summary.docx`, and optional `*.summary.html`: initial content-summary drafts/templates until the agent fills `*.summary.md`.
-- `*.corrections.md`, `*.corrections.docx`, and optional `*.corrections.html`: initial correction/polishing drafts/templates until the agent fills `*.corrections.md`.
-
-The local scripts generate structured templates and Word/HTML shells. They do not call an LLM and do not pretend the summary/corrections are finished. If the user asks to "transcribe and summarize", "整理", "精修", or "生成纪要", the agent must continue after transcription:
-
-1. Read the transcript output.
-2. Fill `*.summary.md` with a real summary, including data and information analysis when numbers, dates, money, percentages, rankings, comparison, growth/decline, business metrics, or task milestones appear.
-3. Fill `*.corrections.md` with likely ASR mistakes, proper nouns, sentence polish notes, and corrected text.
-4. Run `./bin/avt review-sync "/path/to/transcript.txt" --all` or `python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --sync --all` so the completed Markdown is converted into final DOCX/HTML.
-5. Tell the user where every output file is and which file is best for direct delivery.
-
-For "帮我转写并总结/精修" requests, do not stop after step 1 or after creating templates. Complete steps 1-5 in the same turn whenever possible. In the final answer, clearly label:
-
-- Complete transcript: `*.transcript.docx`
-- Initial templates, if not filled: `*.summary.md`, `*.corrections.md`
-- Final synced deliverables after agent work: `*.summary.docx`, `*.corrections.docx`, and HTML files when generated
-
-Do not rerun `postprocess.py --overwrite` after manually filling the summary/corrections unless you intend to reset the deliverables back to templates. Use `--sync` or `./bin/avt review-sync` to preserve the completed Markdown content while regenerating Word/HTML.
-
-If no local LLM API or capable agent is available, do not fail; say clearly that summary/corrections are initial templates and need a later agent pass. Do not upload transcripts or media files.
-
-When the user asks to create or refresh the review pack for an existing transcript, call:
+When the user asks to create or refresh editorial deliverables for an existing transcript, call:
 
 ```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt"
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind summary --all
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind corrections --all
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind publish --all
+python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --kind meeting-notes --all
 ```
 
-For HTML deliverables, call:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
-```
-
-For all review formats, call:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --all
-```
-
-When the user or agent has already completed `*.summary.md` or `*.corrections.md`, sync the finished Markdown to DOCX/HTML instead of rebuilding templates:
+When the user or agent has completed the Markdown, sync the finished Markdown to DOCX/HTML:
 
 ```bash
 ./bin/avt review-sync "/path/to/transcript.txt" --all
@@ -149,74 +252,6 @@ When the user asks for one-step initialization, call:
 
 ```bash
 ./skills/audio-video-transcriber/scripts/bootstrap.sh --yes
-```
-
-## Common Commands
-
-Environment check:
-
-```bash
-./skills/audio-video-transcriber/scripts/doctor.sh
-```
-
-One-step initialization:
-
-```bash
-./skills/audio-video-transcriber/scripts/bootstrap.sh --yes
-```
-
-Install local Whisper environment:
-
-```bash
-./skills/audio-video-transcriber/scripts/install_whisper.sh
-```
-
-Single-file transcription:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4"
-```
-
-Create review deliverables for an existing transcript:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt"
-```
-
-Create review deliverables with HTML:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/postprocess.py "/path/to/transcript.txt" --html
-```
-
-Sync completed Markdown to final Word/HTML:
-
-```bash
-./bin/avt review-sync "/path/to/transcript.txt" --all
-```
-
-Skip review-pack generation for one transcription:
-
-```bash
-python3 skills/audio-video-transcriber/scripts/transcribe.py "/path/to/file.mp4" --no-review
-```
-
-Start inbox watcher:
-
-```bash
-./skills/audio-video-transcriber/scripts/start_watcher.sh
-```
-
-Stop inbox watcher:
-
-```bash
-./skills/audio-video-transcriber/scripts/stop_watcher.sh
-```
-
-Check status:
-
-```bash
-./skills/audio-video-transcriber/scripts/status.sh
 ```
 
 For detailed usage and troubleshooting, read `references/usage.md` only when more examples are needed.

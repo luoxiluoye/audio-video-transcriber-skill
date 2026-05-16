@@ -175,10 +175,10 @@ def find_transcript_output(input_path: Path, output_dir: Path) -> Path | None:
     return None
 
 
-def create_review_files(input_path: Path, output_dir: Path, overwrite: bool = False) -> None:
+def create_transcript_deliverable(input_path: Path, output_dir: Path, overwrite: bool = False) -> None:
     transcript_path = find_transcript_output(input_path, output_dir)
     if not transcript_path:
-        logging.info("Skipping review files because no transcript output was found for: %s", input_path)
+        logging.info("Skipping transcript Word file because no transcript output was found for: %s", input_path)
         return
 
     command = [
@@ -189,41 +189,31 @@ def create_review_files(input_path: Path, output_dir: Path, overwrite: bool = Fa
         str(input_path),
         "--output-dir",
         str(output_dir),
+        "--transcript-only",
     ]
     if overwrite:
         command.append("--overwrite")
-    logging.info("Creating review files for %s", transcript_path)
+    logging.info("Creating transcript deliverable for %s", transcript_path)
     try:
         subprocess.run(command, check=True)
-        print_review_index(input_path, output_dir, transcript_path)
     except subprocess.CalledProcessError as exc:
-        logging.warning("Could not create review files for %s: %s", transcript_path, exc)
+        logging.warning("Could not create transcript deliverable for %s: %s", transcript_path, exc)
 
 
-def print_review_index(input_path: Path, output_dir: Path, transcript_path: Path) -> None:
+def print_transcript_index(input_path: Path, output_dir: Path, transcript_path: Path) -> None:
     stem = input_path.stem
-    expected = [
-        ("原始转写稿", transcript_path),
-        ("Word 版全文稿", output_dir / f"{stem}.transcript.docx"),
-        ("总结稿 Markdown", output_dir / f"{stem}.summary.md"),
-        ("总结稿 Word", output_dir / f"{stem}.summary.docx"),
-        ("精修/纠错稿 Markdown", output_dir / f"{stem}.corrections.md"),
-        ("精修/纠错稿 Word", output_dir / f"{stem}.corrections.docx"),
-        ("总结稿 HTML", output_dir / f"{stem}.summary.html"),
-        ("精修/纠错稿 HTML", output_dir / f"{stem}.corrections.html"),
-    ]
-    print("Initial review pack index:")
-    for label, path in expected:
-        if path.exists():
-            print(f"  {label}: {path}")
+    transcript_docx = output_dir / f"{stem}.transcript.docx"
+    print("Transcription delivery:")
+    print(f"  原始转写稿: {transcript_path}")
+    if transcript_docx.exists():
+        print(f"  Word 版全文稿: {transcript_docx}")
     direct_file = output_dir / f"{stem}.transcript.docx"
     if not direct_file.exists():
         direct_file = transcript_path
     print(f"Directly viewable transcript: {direct_file}")
-    print("Important: summary/corrections files are initial drafts or templates until an Agent fills them.")
-    print("Next step for final summary/corrections:")
-    print(f"  Ask an Agent to read {transcript_path}, fill {output_dir / f'{stem}.summary.md'} and {output_dir / f'{stem}.corrections.md'}, then run:")
-    print(f"  ./bin/avt review-sync \"{transcript_path}\" --all")
+    print("This is the original transcript. It keeps the spoken order and wording.")
+    print("If you need a more usable version, ask Codex to continue with:")
+    print("  内容总结版 / 勘误精修版 / 刊物发布版 / 会议纪要版 / 逐字稿清洁版")
 
 
 def run_whisper(
@@ -284,12 +274,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-review",
         action="store_true",
-        help="Do not create transcript Word, summary, or correction review deliverables after transcription.",
+        help="Do not create the transcript Word deliverable after transcription.",
     )
     parser.add_argument(
         "--overwrite-review",
         action="store_true",
-        help="Overwrite existing review deliverables.",
+        help="Overwrite the transcript Word deliverable.",
     )
     return parser
 
@@ -330,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
             logging.info("Skipping because output already exists: %s", existing_txt)
             print(f"Already transcribed, skipping: {existing_txt}")
             if not args.no_review:
-                create_review_files(input_path, output_dir, overwrite=args.overwrite_review)
+                create_transcript_deliverable(input_path, output_dir, overwrite=args.overwrite_review)
             return 0
 
         if not args.no_wait:
@@ -356,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             logging.warning("No output files found for %s in %s", input_path, output_dir)
 
         if not args.no_review:
-            create_review_files(input_path, output_dir, overwrite=args.overwrite_review)
+            create_transcript_deliverable(input_path, output_dir, overwrite=args.overwrite_review)
 
         if args.move_done:
             destination = unique_destination(dirs["done"] / input_path.name)

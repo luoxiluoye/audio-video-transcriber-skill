@@ -232,26 +232,42 @@ def output_status(path: Path, written: bool) -> str:
     return "written" if written else "exists"
 
 
-def print_initial_review_guidance(transcript_path: Path, output_dir: Path, stem: str, include_html: bool) -> None:
-    print("Initial review pack guidance:")
+def print_initial_review_guidance(
+    transcript_path: Path,
+    output_dir: Path,
+    stem: str,
+    kinds: list[str],
+    include_html: bool,
+) -> None:
+    print("Review draft guidance:")
     transcript_docx = output_dir / f"{stem}.transcript.docx"
     direct_transcript = transcript_docx if transcript_docx.exists() else transcript_path
     print(f"  Directly viewable transcript: {direct_transcript}")
-    print(f"  Initial summary draft/template: {output_dir / f'{stem}.summary.md'}")
-    print(f"  Initial corrections draft/template: {output_dir / f'{stem}.corrections.md'}")
-    if include_html:
-        print(f"  Initial summary HTML/template: {output_dir / f'{stem}.summary.html'}")
-        print(f"  Initial corrections HTML/template: {output_dir / f'{stem}.corrections.html'}")
-    print("  The summary/corrections DOCX/HTML files are not final analysis until an Agent or user completes the Markdown.")
+    for kind in kinds:
+        label = title_for_kind(kind)
+        print(f"  {label} Markdown: {output_dir / markdown_filename(stem, kind)}")
+        if include_html:
+            print(f"  {label} HTML: {output_dir / f'{stem}.{kind}.html'}")
+    print("  These review files are draft shells until an Agent or user completes the Markdown.")
     print("Next step for final deliverables:")
-    print(f"  Fill {output_dir / f'{stem}.summary.md'} and {output_dir / f'{stem}.corrections.md'}, then run:")
+    print("  Fill the generated Markdown, then sync it to Word/HTML with:")
     print(f"  ./bin/avt review-sync \"{transcript_path}\" --all")
+
+
+def print_transcript_guidance(transcript_path: Path, output_dir: Path, stem: str) -> None:
+    transcript_docx = output_dir / f"{stem}.transcript.docx"
+    print("Transcript deliverables:")
+    print(f"  原始转写稿: {transcript_path}")
+    if transcript_docx.exists():
+        print(f"  Word 版全文稿: {transcript_docx}")
+    print("我已完成原始转写稿。这版保留了口语表达和原始顺序。")
+    print("如果需要，我还可以继续整理成：内容总结版、勘误精修版、刊物发布版、会议纪要版、逐字稿清洁版。")
 
 
 def print_sync_guidance(results: list[tuple[Path, bool]]) -> None:
     docx_files = [path for path, _ in results if path.suffix.lower() == ".docx"]
     html_files = [path for path, _ in results if path.suffix.lower() == ".html"]
-    print("Final review deliverables:")
+    print("Final deliverables:")
     if docx_files:
         print("  Word files for direct handoff:")
         for path in docx_files:
@@ -403,6 +419,81 @@ Generated at: {generated_at}
 ```text
 {transcript}
 ```
+"""
+
+
+def build_publish(transcript_path: Path, source_file: str, transcript: str, generated_at: str) -> str:
+    chunks = preview_chunks(transcript, max_chunks=10, chunk_chars=300)
+    source_material = "\n\n".join(chunks) if chunks else transcript or "Transcript is empty or could not be parsed."
+    return f"""# 刊物发布版
+
+Source media: `{source_file or "unknown"}`
+
+Transcript: `{transcript_path}`
+
+Generated at: {generated_at}
+
+> Agent task: read the transcript at the path above and turn it into a publishable Chinese article. Preserve the speaker's meaning, keep core viewpoints, add only light transitions when needed, and do not invent facts.
+
+## 发布稿正文
+
+待 agent 精修：在不改变原意的基础上，整理为自然、连贯、有段落结构的文章。可以适度补充衔接语，但不得编造事实。
+
+## 人工审校提示
+
+- 核对人名、机构名、地名、品牌名和术语。
+- 核对数字、日期、金额、百分比和引用。
+- 删除不适合发布的口头停顿、重复表达和无意义语气词。
+- 保留讲话者核心观点，不把推测写成事实。
+
+## 转写素材
+
+```text
+{source_material}
+```
+"""
+
+
+def build_meeting_notes(transcript_path: Path, source_file: str, transcript: str, generated_at: str) -> str:
+    chunks = preview_chunks(transcript, max_chunks=10, chunk_chars=300)
+    chunk_lines = "\n".join(f"{idx}. {chunk}" for idx, chunk in enumerate(chunks, 1))
+    if not chunk_lines:
+        chunk_lines = "1. Transcript is empty or could not be parsed."
+    return f"""# 会议纪要版
+
+Source media: `{source_file or "unknown"}`
+
+Transcript: `{transcript_path}`
+
+Generated at: {generated_at}
+
+> Agent task: read the transcript at the path above and create meeting notes for quick reporting. Extract the topic, core viewpoints, action items, risks, and next steps. Do not invent decisions or owners.
+
+## 会议主题
+
+待 agent 整理：用一句话说明这段会议/讨论的主题。
+
+## 核心观点
+
+- 待 agent 提炼。
+
+## 待办事项
+
+| 待办 | 负责人 | 截止时间 | 上下文 |
+| --- | --- | --- | --- |
+| 待 agent 核对 | 待 agent 填写 | 待 agent 填写 | 待 agent 填写 |
+
+## 风险点
+
+- 待 agent 提炼需要确认、存在分歧或可能影响后续推进的事项。
+
+## 后续动作
+
+- 待 agent 提炼下一步行动。
+
+## 转写线索预览
+
+{chunk_lines}
 """
 
 
@@ -807,6 +898,10 @@ def review_kind_from_markdown(path: Path) -> str | None:
         return "summary"
     if name.endswith(".corrections.md"):
         return "corrections"
+    if name.endswith(".publish.md"):
+        return "publish"
+    if name.endswith(".meeting-notes.md"):
+        return "meeting-notes"
     return None
 
 
@@ -816,7 +911,21 @@ def base_stem_from_review_markdown(path: Path) -> str:
         return name[: -len(".summary.md")]
     if name.endswith(".corrections.md"):
         return name[: -len(".corrections.md")]
+    if name.endswith(".publish.md"):
+        return name[: -len(".publish.md")]
+    if name.endswith(".meeting-notes.md"):
+        return name[: -len(".meeting-notes.md")]
     return path.stem
+
+
+def title_for_kind(kind: str) -> str:
+    titles = {
+        "summary": "内容总结",
+        "corrections": "勘误与精修版",
+        "publish": "刊物发布版",
+        "meeting-notes": "会议纪要版",
+    }
+    return titles.get(kind, "整理稿")
 
 
 def sync_markdown_file(
@@ -834,7 +943,7 @@ def sync_markdown_file(
 
     markdown_text = read_text(markdown_path)
     base_stem = base_stem_from_review_markdown(markdown_path)
-    title = markdown_title(markdown_text, "内容总结" if kind == "summary" else "勘误与精修版")
+    title = markdown_title(markdown_text, title_for_kind(kind))
     generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
     output_formats = []
     if include_docx:
@@ -869,7 +978,12 @@ def sync_markdown_file(
 
 def sibling_review_markdown_paths(transcript_path: Path, output_dir: Path) -> list[Path]:
     stem = transcript_path.stem
-    return [output_dir / f"{stem}.summary.md", output_dir / f"{stem}.corrections.md"]
+    return [
+        output_dir / f"{stem}.summary.md",
+        output_dir / f"{stem}.corrections.md",
+        output_dir / f"{stem}.publish.md",
+        output_dir / f"{stem}.meeting-notes.md",
+    ]
 
 
 def sync_review_outputs(
@@ -890,10 +1004,12 @@ def sync_review_outputs(
     if not input_path.exists():
         return [], [f"Input file not found: {input_path}"]
 
-    for markdown_path in sibling_review_markdown_paths(input_path, resolved_output_dir):
-        if not markdown_path.exists():
-            warnings.append(f"Review Markdown not found, skipping sync: {markdown_path}")
-            continue
+    candidates = sibling_review_markdown_paths(input_path, resolved_output_dir)
+    existing_candidates = [path for path in candidates if path.exists()]
+    if not existing_candidates:
+        return [], [f"No review Markdown files found beside: {input_path}"]
+
+    for markdown_path in existing_candidates:
         synced, sync_warnings = sync_markdown_file(markdown_path, resolved_output_dir, include_docx, include_html, overwrite)
         results.extend(synced)
         warnings.extend(sync_warnings)
@@ -901,23 +1017,62 @@ def sync_review_outputs(
     return results, warnings
 
 
+def selected_kinds(values: list[str] | None) -> list[str]:
+    if values:
+        return values
+    return ["summary", "corrections"]
+
+
+def build_markdown_for_kind(
+    kind: str,
+    transcript_path: Path,
+    source_file: str,
+    transcript: str,
+    generated_at: str,
+) -> str:
+    if kind == "summary":
+        return build_summary(transcript_path, source_file, transcript, generated_at)
+    if kind == "corrections":
+        return build_corrections(transcript_path, source_file, transcript, generated_at)
+    if kind == "publish":
+        return build_publish(transcript_path, source_file, transcript, generated_at)
+    if kind == "meeting-notes":
+        return build_meeting_notes(transcript_path, source_file, transcript, generated_at)
+    raise ValueError(f"Unsupported deliverable kind: {kind}")
+
+
+def markdown_filename(stem: str, kind: str) -> str:
+    return f"{stem}.{kind}.md"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create Markdown, Word, and optional HTML review deliverables for a transcript."
+        description="Create transcript, summary, correction, publish, or meeting-note deliverables."
     )
     parser.add_argument("transcript", help="Path to a transcript file or review Markdown file.")
     parser.add_argument("--source-file", default="", help="Original media file path.")
     parser.add_argument("--output-dir", default=None, help="Directory for review outputs.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing review outputs.")
+    parser.add_argument(
+        "--transcript-only",
+        action="store_true",
+        help="Generate only the transcript Word file. This is the default transcribe flow.",
+    )
+    parser.add_argument(
+        "--kind",
+        action="append",
+        choices=["summary", "corrections", "publish", "meeting-notes"],
+        help="Review deliverable to create. Repeat for multiple kinds. Defaults to summary and corrections.",
+    )
     parser.add_argument("--docx", action="store_true", help="Generate Word outputs. This is enabled by default.")
     parser.add_argument("--no-docx", action="store_true", help="Skip Word outputs.")
-    parser.add_argument("--html", action="store_true", help="Generate HTML outputs for summary and corrections.")
+    parser.add_argument("--html", action="store_true", help="Generate HTML outputs for selected review deliverables.")
     parser.add_argument("--all", action="store_true", help="Generate Markdown, Word, and HTML outputs.")
     parser.add_argument("--markdown-only", action="store_true", help="Generate only Markdown outputs.")
     parser.add_argument(
         "--sync",
         action="store_true",
-        help="Read existing *.summary.md/*.corrections.md and sync their current content to DOCX/HTML.",
+        help="Read existing review Markdown and sync its current content to DOCX/HTML.",
     )
     return parser
 
@@ -958,42 +1113,24 @@ def main(argv: list[str] | None = None) -> int:
         transcript = "\n".join(segment.text for segment in segments if segment.text).strip()
         stem = transcript_path.stem
         generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
-        output_formats = ["summary.md", "corrections.md"]
+        kinds = selected_kinds(args.kind)
+        output_formats = []
+        if args.transcript_only:
+            output_formats.append("transcript.docx")
+        else:
+            output_formats.extend(f"{kind}.md" for kind in kinds)
         if include_docx:
-            output_formats.extend(["transcript.docx", "summary.docx", "corrections.docx"])
+            if "transcript.docx" not in output_formats:
+                output_formats.append("transcript.docx")
+            if not args.transcript_only:
+                output_formats.extend(f"{kind}.docx" for kind in kinds)
         if include_html:
-            output_formats.extend(["summary.html", "corrections.html"])
+            output_formats.extend(f"{kind}.html" for kind in kinds)
 
-        summary_path = output_dir / f"{stem}.summary.md"
-        corrections_path = output_dir / f"{stem}.corrections.md"
         transcript_docx_path = output_dir / f"{stem}.transcript.docx"
-        summary_docx_path = output_dir / f"{stem}.summary.docx"
-        corrections_docx_path = output_dir / f"{stem}.corrections.docx"
-        summary_html_path = output_dir / f"{stem}.summary.html"
-        corrections_html_path = output_dir / f"{stem}.corrections.html"
 
         results: list[tuple[Path, bool]] = []
         warnings: list[str] = []
-        results.append(
-            (
-                summary_path,
-                write_if_needed(
-                    summary_path,
-                    build_summary(transcript_path, args.source_file, transcript, generated_at),
-                    args.overwrite,
-                ),
-            )
-        )
-        results.append(
-            (
-                corrections_path,
-                write_if_needed(
-                    corrections_path,
-                    build_corrections(transcript_path, args.source_file, transcript, generated_at),
-                    args.overwrite,
-                ),
-            )
-        )
 
         if include_docx:
             try:
@@ -1011,60 +1148,75 @@ def main(argv: list[str] | None = None) -> int:
                         ),
                     )
                 )
-                results.append(
-                    (
-                        summary_docx_path,
-                        create_summary_docx(
-                            summary_docx_path,
-                            transcript_path,
-                            args.source_file,
-                            generated_at,
-                            output_formats,
-                            transcript,
-                            args.overwrite,
-                        ),
-                    )
-                )
-                results.append(
-                    (
-                        corrections_docx_path,
-                        create_corrections_docx(
-                            corrections_docx_path,
-                            transcript_path,
-                            args.source_file,
-                            generated_at,
-                            output_formats,
-                            args.overwrite,
-                        ),
-                    )
-                )
             except RuntimeError as exc:
                 warnings.append(str(exc))
             except Exception as exc:  # noqa: BLE001 - review deliverables should not break transcription.
-                warnings.append(f"Could not create Word outputs: {exc}")
+                warnings.append(f"Could not create transcript Word output: {exc}")
 
-        if include_html:
-            info_lines = build_info_lines(transcript_path, args.source_file, generated_at, output_formats)
-            results.append(
-                (
-                    summary_html_path,
-                    write_if_needed(summary_html_path, build_summary_html(info_lines, transcript), args.overwrite),
-                )
-            )
-            results.append(
-                (
-                    corrections_html_path,
-                    write_if_needed(corrections_html_path, build_corrections_html(info_lines), args.overwrite),
-                )
-            )
+        if not args.transcript_only:
+            for kind in kinds:
+                markdown_path = output_dir / markdown_filename(stem, kind)
+                markdown_text = build_markdown_for_kind(kind, transcript_path, args.source_file, transcript, generated_at)
+                results.append((markdown_path, write_if_needed(markdown_path, markdown_text, args.overwrite)))
 
-        print("Initial review pack outputs:")
+                if include_docx:
+                    docx_path = output_dir / f"{stem}.{kind}.docx"
+                    try:
+                        if kind == "summary":
+                            written = create_summary_docx(
+                                docx_path,
+                                transcript_path,
+                                args.source_file,
+                                generated_at,
+                                output_formats,
+                                transcript,
+                                args.overwrite,
+                            )
+                        elif kind == "corrections":
+                            written = create_corrections_docx(
+                                docx_path,
+                                transcript_path,
+                                args.source_file,
+                                generated_at,
+                                output_formats,
+                                args.overwrite,
+                            )
+                        else:
+                            info_lines = build_info_lines(transcript_path, args.source_file, generated_at, output_formats)
+                            written = create_markdown_docx(
+                                docx_path,
+                                title_for_kind(kind),
+                                info_lines,
+                                markdown_text,
+                                args.overwrite,
+                            )
+                        results.append((docx_path, written))
+                    except RuntimeError as exc:
+                        warnings.append(str(exc))
+                    except Exception as exc:  # noqa: BLE001 - other deliverables should still be created.
+                        warnings.append(f"Could not create Word output for {kind}: {exc}")
+
+                if include_html:
+                    html_path = output_dir / f"{stem}.{kind}.html"
+                    info_lines = build_info_lines(transcript_path, args.source_file, generated_at, output_formats)
+                    if kind == "summary":
+                        html_text = build_summary_html(info_lines, transcript)
+                    elif kind == "corrections":
+                        html_text = build_corrections_html(info_lines)
+                    else:
+                        html_text = build_markdown_sync_html(title_for_kind(kind), info_lines, markdown_text)
+                    results.append((html_path, write_if_needed(html_path, html_text, args.overwrite)))
+
+        print("Transcript outputs:" if args.transcript_only else "Review draft outputs:")
         for path, written in results:
             print(f"  {output_status(path, written)}: {path}")
         if warnings:
             for warning in warnings:
                 print(f"Warning: {warning}", file=sys.stderr)
-        print_initial_review_guidance(transcript_path, output_dir, stem, include_html)
+        if args.transcript_only:
+            print_transcript_guidance(transcript_path, output_dir, stem)
+        else:
+            print_initial_review_guidance(transcript_path, output_dir, stem, kinds, include_html)
         return 0
     except Exception as exc:  # noqa: BLE001 - CLI should print friendly errors.
         print(f"Error: {exc}", file=sys.stderr)
